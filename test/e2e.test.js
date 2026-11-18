@@ -186,6 +186,22 @@ test('ARCHFLOW full flow', async (t) => {
     r = await pm.post(`/projects/${S.pid3}/phases/${p3[3].id}/remove`, {});
     p3 = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', S.pid3);
     assert.deepEqual(p3.map((p) => [p.seq, p.name]), [[1, 'Pre-design & Client Brief'], [2, 'Site Analysis & Feasibility'], [3, 'Concept Design'], [4, 'Interior Styling']]);
+    // a phase completes automatically when all its tasks are done, and re-opens if a task is re-opened
+    const ph1Tasks = await db.all('SELECT * FROM tasks WHERE phase_id = ? ORDER BY id', p3[0].id);
+    let b4 = await lastId();
+    await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[0].id}`, { status: 'done' });
+    assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'in_progress', 'one task left');
+    r = await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[1].id}`, null, { json: { status: 'done' } });
+    assert.match(JSON.parse(r.text).messages[0], /completed/);
+    assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'completed', 'auto-completed at 100%');
+    assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[1].id)).status, 'in_progress', 'next phase started');
+    assert.ok((await emails("id > ? AND subject LIKE '%Phase complete: Pre-design%'", b4)).length, 'team emailed');
+    r = await pm.get(`/projects/${S.pid3}/phases`);
+    assert.match(r.text, /Phases completed<\/div><b>1 of 4<\/b>/);
+    await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[1].id}`, { status: 'in_progress' });
+    assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'in_progress', 're-opened');
+    await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[1].id}`, { status: 'done' });
+    assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'completed');
     r = await arch.post(`/projects/${S.pid3}/phases/add`, { name: 'Nope' });
     assert.equal(r.status, 404, 'architect is not on this project / cannot manage phases');
     // keep later plan-limit tests unaffected

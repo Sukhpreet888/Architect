@@ -28,7 +28,7 @@ document.querySelectorAll('.col').forEach(col => {
   col.addEventListener('drop', async e => {
     e.preventDefault(); col.classList.remove('over'); if (!drag) return;
     const r = await fetch(drag.dataset.url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ status: col.dataset.status }) });
-    if (r.ok) col.appendChild(drag); else { const j = await r.json().catch(() => ({})); alert((j.errors || ['Could not update task']).join('\n')); }
+    if (r.ok) { col.appendChild(drag); const j = await r.json().catch(() => ({})); if (j.messages && j.messages.length) alert(j.messages.join('\n')); } else { const j = await r.json().catch(() => ({})); alert((j.errors || ['Could not update task']).join('\n')); }
   });
 });
 </script>

@@ -161,7 +161,12 @@ router.post('/projects/:pid/construction/issues/:iid', loadProject, projectOpen,
     req.flash('success', 'Rectification task assigned — emailed to assignee.');
   } else if (req.body.action === 'resolve') {
     await db.run("UPDATE site_issues SET status = 'resolved' WHERE id = ?", issue.id);
-    if (issue.task_id) await db.run("UPDATE tasks SET status = 'done', progress = 100, completed_at = ? WHERE id = ? AND status != 'done'", today(), issue.task_id);
+    if (issue.task_id) {
+      await db.run("UPDATE tasks SET status = 'done', progress = 100, completed_at = ? WHERE id = ? AND status != 'done'", today(), issue.task_id);
+      const t = await db.get('SELECT phase_id FROM tasks WHERE id = ?', issue.task_id);
+      const r = t && await S.syncPhaseWithTasks(t.phase_id);
+      if (r && r.completed) await N.phaseCompleted(req.project, r.phase, r.next);
+    }
     req.flash('success', 'Issue resolved.');
   }
   res.redirect(back(req, `${base(req)}#site`));

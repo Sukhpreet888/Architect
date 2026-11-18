@@ -232,6 +232,29 @@ async function completePhase(phaseId) {
   return { phase, next, allComplete: prog.allComplete };
 }
 
+/**
+ * Keep a phase's status in line with its tasks:
+ * - every task done (and at least one task) -> the phase is completed and the next phase starts;
+ * - a task in a completed phase is re-opened or added -> the phase goes back to in progress.
+ * Phases in internal review are left to the reviewers. Returns { completed, reopened, next } or null.
+ */
+async function syncPhaseWithTasks(phaseId) {
+  if (!phaseId) return null;
+  const phase = await db.get('SELECT * FROM phases WHERE id = ?', phaseId);
+  if (!phase || phase.status === 'na' || phase.status === 'in_review') return null;
+  const t = await db.get("SELECT COUNT(*) total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) done FROM tasks WHERE phase_id = ?", phaseId);
+  const total = Number(t.total) || 0; const done = Number(t.done) || 0;
+  if (total > 0 && done === total && (phase.status === 'in_progress' || phase.status === 'not_started')) {
+    const r = await completePhase(phaseId);
+    return { completed: true, phase: r.phase, next: r.next, allComplete: r.allComplete };
+  }
+  if (phase.status === 'completed' && done < total) {
+    await db.run("UPDATE phases SET status = 'in_progress', completed_at = NULL, started_at = COALESCE(started_at, ?) WHERE id = ?", today(), phaseId);
+    return { reopened: true, phase };
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- invoices
 async function invoiceTotals(inv) {
   const paid = (await db.get('SELECT COALESCE(SUM(amount),0) s FROM payments WHERE invoice_id = ?', inv.id)).s;
@@ -308,6 +331,6 @@ async function closureChecklist(project) {
 module.exports = {
   can, orgLimits, orgUsage, subscriptionState, orgMembers, activeMembers, emailsForRoles, userById, isOrgUser,
   visibleProjects, canAccessProject, projectTeam, projectTeamEmails, projectManagerEmails, ensureDefaultTemplate,
-  createProjectWithWorkflow, defaultPhaseSelection, addPhaseToProject, phaseRemovalBlocker, removePhase, renumberPhases, phaseProgress, completePhase, invoiceTotals, refreshInvoiceStatus, nextInvoiceNumber,
+  createProjectWithWorkflow, defaultPhaseSelection, addPhaseToProject, phaseRemovalBlocker, removePhase, renumberPhases, phaseProgress, completePhase, syncPhaseWithTasks, invoiceTotals, refreshInvoiceStatus, nextInvoiceNumber,
   paymentsSummary, resolveApproval, closureChecklist,
 };

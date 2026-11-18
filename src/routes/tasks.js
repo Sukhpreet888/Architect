@@ -89,6 +89,19 @@ async function dependencyBlock(task, status) {
   return dep && dep.status !== 'done' ? `Blocked: "${dep.title}" must be completed first.` : null;
 }
 
+/** Apply automatic phase completion/re-opening after task changes, emailing the team when a phase completes. */
+async function syncPhases(req, phaseIds) {
+  const msgs = [];
+  for (const pid of [...new Set(phaseIds.filter(Boolean))]) {
+    const r = await S.syncPhaseWithTasks(pid);
+    if (r && r.completed) {
+      await N.phaseCompleted(req.project, r.phase, r.next);
+      msgs.push(r.next ? `All tasks done — phase "${r.phase.name}" completed; "${r.next.name}" is now in progress.` : `All tasks done — phase "${r.phase.name}" completed.`);
+    } else if (r && r.reopened) msgs.push(`Phase "${r.phase.name}" re-opened because it has open tasks again.`);
+  }
+  return msgs;
+}
+
 router.post('/projects/:pid/tasks', loadProject, projectOpen, perm('task_manage'), async (req, res) => {
   const { out, errors } = await validTask(req, { priority: 'medium', ...req.body });
   if (errors.length) { req.flash('error', errors.join(' ')); return res.redirect(back(req)); }
@@ -96,6 +109,7 @@ router.post('/projects/:pid/tasks', loadProject, projectOpen, perm('task_manage'
   const task = await db.get('SELECT * FROM tasks WHERE id = ?', id);
   if (task.assignee_id) await N.taskAssigned(task, req.project, req.user);
   req.flash('success', `Task created${task.assignee_id ? ' — assignee notified by email' : ''}.`);
+  for (const m of await syncPhases(req, [task.phase_id])) req.flash('success', m);
   res.redirect(back(req, `/projects/${req.project.id}/tasks`));
 });
 
@@ -129,6 +143,7 @@ router.post('/projects/:pid/tasks/:tid', loadProject, projectOpen, loadTask, per
     if (!req.can('project_manage') && before.created_by !== req.user.id) throw httpError(403, 'Only managers or the creator can delete a task.');
     await db.run('DELETE FROM tasks WHERE id = ?', before.id);
     req.flash('success', 'Task deleted.');
+    for (const m of await syncPhases(req, [before.phase_id])) req.flash('success', m);
     return res.redirect(`/projects/${req.project.id}/tasks`);
   }
   const { out, errors } = await validTask(req, req.body, before.id);
@@ -148,8 +163,10 @@ router.post('/projects/:pid/tasks/:tid', loadProject, projectOpen, loadTask, per
   if (after.due_date !== before.due_date) changes.push(`due date → ${after.due_date || 'none'}`);
   if (after.priority !== before.priority) changes.push(`priority → ${PRIORITIES[after.priority]}`);
   if (changes.length) await N.taskUpdated(after, req.project, req.user, changes.join(', '));
-  if (req.is('json')) return res.json({ ok: true, task: after });
+  const phaseMsgs = await syncPhases(req, [before.phase_id, after.phase_id]);
+  if (req.is('json')) return res.json({ ok: true, task: after, messages: phaseMsgs });
   req.flash('success', 'Task updated.');
+  for (const m of phaseMsgs) req.flash('success', m);
   res.redirect(back(req, `/projects/${req.project.id}/tasks/${before.id}`));
 });
 
