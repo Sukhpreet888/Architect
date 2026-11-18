@@ -27,15 +27,20 @@
 
 <div class="grid g2">
 <div class="card"><h2>Subphases, tasks & deliverables</h2>
-  <% subphases.forEach(sp => { %>
-    <h3><%= sp.name %></h3>
+  <% const canTick = open && can('task_manage'); %>
+  <% const tickBox = (t) => { const done = t.status === 'done';
+       const box = `<span class="tick ${done ? 'on' : ''}" aria-hidden="true">${done ? '✓' : ''}</span>`;
+       return canTick ? `<form class="inline" method="post" action="${base}/tasks/${t.id}"><input type="hidden" name="status" value="${done ? 'todo' : 'done'}"><button class="tick-btn" title="${done ? 'Mark as not done' : 'Mark as done'}" aria-label="${done ? 'Mark as not done' : 'Mark as done'}: ${esc(t.title)}">${box}</button></form>` : box; }; %>
+  <% subphases.forEach(sp => { const spTasks = tasks.filter(t => t.subphase_id === sp.id); const spDone = spTasks.length > 0 && spTasks.every(t => t.status === 'done'); %>
+    <h3 class="subphase-head"><span class="tick <%= spDone ? 'on' : '' %>" aria-hidden="true"><%= spDone ? '✓' : '' %></span> <%= sp.name %>
+      <span class="muted small" style="font-weight:400"><%= spTasks.filter(t => t.status === 'done').length %>/<%= spTasks.length %> tasks done<%= spDone ? ' · completed' : '' %></span></h3>
     <table class="small">
-    <% tasks.filter(t => t.subphase_id === sp.id).forEach(t => { %><tr><td>☐ <a href="<%= base %>/tasks/<%= t.id %>"><%= t.title %></a></td><td><%= t.assignee || 'Unassigned' %></td><td class="nowrap"><%= fmtDate(t.due_date) %></td><td><%- badge(t.status) %></td></tr><% }) %>
+    <% spTasks.forEach(t => { %><tr class="<%= t.status === 'done' ? 'task-done' : '' %>"><td><%- tickBox(t) %> <a href="<%= base %>/tasks/<%= t.id %>"><%= t.title %></a></td><td><%= t.assignee || 'Unassigned' %></td><td class="nowrap"><%= fmtDate(t.due_date) %></td><td><%- badge(t.status) %></td></tr><% }) %>
     <% deliverables.filter(d => d.subphase_id === sp.id).forEach(d => { %><tr><td colspan="2">📄 <b><%= d.name %></b> <span class="muted">deliverable</span></td><td class="nowrap"><%= fmtDate(d.due_date) %></td>
       <td><% if (open && can('task_manage') && d.status !== 'approved') { %><form method="post" action="<%= base %>/deliverables/<%= d.id %>"><select name="status" onchange="this.form.submit()"><% ['pending','in_progress','submitted'].concat(can('project_manage') ? ['approved'] : []).forEach(s => { %><option value="<%= s %>" <%= d.status===s?'selected':'' %>><%= s.replace('_',' ') %></option><% }) %><% if (d.status === 'revision_required') { %><option selected>revision required</option><% } %></select></form><% } else { %><%- badge(d.status) %><% } %></td></tr><% }) %>
     </table>
   <% }) %>
-  <% const loose = tasks.filter(t => !t.subphase_id); if (loose.length) { %><h3>Other tasks</h3><table class="small"><% loose.forEach(t => { %><tr><td><a href="<%= base %>/tasks/<%= t.id %>"><%= t.title %></a></td><td><%= t.assignee || '—' %></td><td><%- badge(t.status) %></td></tr><% }) %></table><% } %>
+  <% const loose = tasks.filter(t => !t.subphase_id); if (loose.length) { %><h3>Other tasks</h3><table class="small"><% loose.forEach(t => { %><tr class="<%= t.status === 'done' ? 'task-done' : '' %>"><td><%- tickBox(t) %> <a href="<%= base %>/tasks/<%= t.id %>"><%= t.title %></a></td><td><%= t.assignee || '—' %></td><td><%- badge(t.status) %></td></tr><% }) %></table><% } %>
   <% if (open && can('task_manage')) { %>
   <details style="margin-top:12px"><summary>+ Add subphase / task / deliverable</summary>
     <form method="post" action="<%= base %>/phases/<%= phase.id %>/subphases" class="row" style="margin-top:8px"><input name="name" placeholder="New subphase name"><div style="flex:0"><button class="btn sm">Add subphase</button></div></form>

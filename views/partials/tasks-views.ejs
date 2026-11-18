@@ -2,12 +2,11 @@
 <div class="seg" style="margin-bottom:12px"><a href="<%= qs({ view: 'list' }) %>" class="<%= view==='list'?'on':'' %>">List</a><a href="<%= qs({ view: 'kanban' }) %>" class="<%= view==='kanban'?'on':'' %>">Kanban</a><a href="<%= qs({ view: 'calendar' }) %>" class="<%= view==='calendar'?'on':'' %>">Calendar</a></div>
 <% const link = (t) => `/projects/${t.project_id}/tasks/${t.id}`; const late = (t) => t.status !== 'done' && t.due_date && t.due_date < today; %>
 <% if (view === 'list') { %>
-<div class="card tablewrap"><table><tr><th>Task</th><% if (locals.showProject) { %><th>Project</th><% } %><th>Assignee</th><th>Priority</th><th>Due</th><th>Progress</th><th>Status</th></tr>
+<div class="card tablewrap"><table><tr><th>Task</th><% if (locals.showProject) { %><th>Project</th><% } %><th>Assignee</th><th>Priority</th><th>Due</th><th>Status</th></tr>
 <% tasks.forEach(t => { %><tr><td><a href="<%= link(t) %>"><%= t.title %></a><% if (t.phase_name) { %><div class="muted small"><%= t.phase_name %></div><% } %><% if (t.depends_on) { %><div class="muted small">⛓ has dependency</div><% } %></td>
 <% if (locals.showProject) { %><td class="small"><%= t.code %> · <%= t.project_name %></td><% } %>
-<td><%= t.assignee || '—' %></td><td><%- badge(t.priority) %></td><td class="nowrap"><%= fmtDate(t.due_date) %> <% if (late(t)) { %><%- badge('overdue') %><% } %></td>
-<td style="min-width:90px"><div class="bar"><i style="width:<%= t.progress %>%"></i></div><span class="small muted"><%= t.progress %>%</span></td><td><%- badge(t.status) %></td></tr><% }) %>
-<% if (!tasks.length) { %><tr><td colspan="7" class="empty">No tasks.</td></tr><% } %></table></div>
+<td><%= t.assignee || '—' %></td><td><%- badge(t.priority) %></td><td class="nowrap"><%= fmtDate(t.due_date) %> <% if (late(t)) { %><%- badge('overdue') %><% } %></td><td><%- badge(t.status) %></td></tr><% }) %>
+<% if (!tasks.length) { %><tr><td colspan="6" class="empty">No tasks.</td></tr><% } %></table></div>
 <% } else if (view === 'kanban') { %>
 <div class="kanban">
 <% Object.entries(C.TASK_STATUSES).forEach(([k, label]) => { const col = tasks.filter(t => t.status === k); %>

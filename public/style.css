@@ -73,3 +73,8 @@ details>summary{cursor:pointer;font-weight:600;color:var(--blue)}
 .phase-pick{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin:0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:#fff}
 .phase-pick:has(input:checked){border-color:#8ab8f2;background:#f5f9ff}.phase-pick input{margin-top:3px}
 .manage-phases table td{vertical-align:middle}
+.tick{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1.5px solid #9aa8bc;border-radius:4px;font-size:11px;font-weight:700;line-height:1;vertical-align:-3px;background:#fff;color:#fff}
+.tick.on{background:var(--green);border-color:var(--green)}
+.tick-btn{border:0;background:none;padding:0;cursor:pointer;vertical-align:-3px}.tick-btn:hover .tick{border-color:var(--green)}
+.subphase-head .tick{width:18px;height:18px;font-size:12px}
+tr.task-done td a{color:var(--muted);text-decoration:line-through}

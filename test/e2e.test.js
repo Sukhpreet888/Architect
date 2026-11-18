@@ -202,6 +202,14 @@ test('ARCHFLOW full flow', async (t) => {
     assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'in_progress', 're-opened');
     await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[1].id}`, { status: 'done' });
     assert.equal((await db.get('SELECT status FROM phases WHERE id = ?', p3[0].id)).status, 'completed');
+    r = await pm.get(`/projects/${S.pid3}/phases/${p3[0].id}`);
+    assert.match(r.text, /<span class="tick on" aria-hidden="true">✓<\/span> Brief/, 'subphase ticked when all its tasks are done');
+    assert.match(r.text, /2\/2 tasks done · completed/);
+    assert.doesNotMatch((await pm.get(`/projects/${S.pid3}/tasks/${ph1Tasks[0].id}`)).text, /name="progress"/, 'no progress % entry');
+    // the tick box un-ticks a task (status back to To do, progress 0)
+    await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[0].id}`, { status: 'todo' });
+    assert.deepEqual(Object.values(await db.get('SELECT status, progress FROM tasks WHERE id = ?', ph1Tasks[0].id)), ['todo', 0]);
+    await pm.post(`/projects/${S.pid3}/tasks/${ph1Tasks[0].id}`, { status: 'done' });
     r = await arch.post(`/projects/${S.pid3}/phases/add`, { name: 'Nope' });
     assert.equal(r.status, 404, 'architect is not on this project / cannot manage phases');
     // keep later plan-limit tests unaffected

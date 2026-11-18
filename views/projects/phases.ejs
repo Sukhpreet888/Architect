@@ -5,7 +5,7 @@
   <%- include('../partials/donut', { pct: prog.pct, size: 150, label: 'complete' }) %>
   <div class="progress-facts">
     <div class="head" style="margin:0 0 4px"><h2 style="margin:0">Project completion: <%= prog.pct %>%</h2><% if (manage) { %><a class="btn sm ghost" href="?manage=1#manage">Add / remove phases</a><% } %></div>
-    <p class="muted small" style="margin:0 0 12px">Average completion of the <%= prog.applicable %> phases in this project. Each phase's % comes from its tasks' progress.</p>
+    <p class="muted small" style="margin:0 0 12px">Average completion of the <%= prog.applicable %> phases in this project. Each phase's % is the share of its tasks that are done.</p>
     <div class="grid g3">
       <div><div class="muted small">Phases completed</div><b><%= completedPhases %> of <%= prog.applicable %></b></div>
       <div><div class="muted small">Tasks done</div><b><%= prog.tasksDone %> of <%= prog.tasksTotal %></b></div>
@@ -25,7 +25,7 @@
   </a>
 <% }) %>
 </div>
-<p class="muted small">Phase % = average progress of the phase's tasks (a task marked done counts as 100%). A phase approved/marked complete is 100%.</p>
+<p class="muted small">Phase % = share of the phase's tasks marked done. When every task is done the phase is completed automatically.</p>
 <% if (manage) { %>
 <details class="card manage-phases" id="manage" <%= query.manage ? 'open' : '' %>>
   <summary>Manage phases — add or remove phases in this project</summary>

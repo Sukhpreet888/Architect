@@ -78,7 +78,6 @@ async function validTask(req, b, existingId) {
     }
     out.depends_on = v || null;
   }
-  if (b.progress !== undefined) out.progress = Math.max(0, Math.min(100, int(b.progress) || 0));
   if (b.status !== undefined) { if (!TASK_STATUSES[b.status]) errors.push('Invalid status.'); else out.status = b.status; }
   return { out, errors };
 }
@@ -137,7 +136,7 @@ router.post('/projects/:pid/tasks/:tid', loadProject, projectOpen, loadTask, per
   const isAssignee = before.assignee_id === req.user.id;
   if (!req.can('project_manage') && !isAssignee && before.created_by !== req.user.id) {
     // other team members may only update status/progress
-    for (const k of Object.keys(req.body)) if (!['status', 'progress'].includes(k)) delete req.body[k];
+    for (const k of Object.keys(req.body)) if (k !== 'status') delete req.body[k];
   }
   if (req.body.action === 'delete') {
     if (!req.can('project_manage') && before.created_by !== req.user.id) throw httpError(403, 'Only managers or the creator can delete a task.');
@@ -153,7 +152,8 @@ router.post('/projects/:pid/tasks/:tid', loadProject, projectOpen, loadTask, per
     if (req.accepts(['html', 'json']) === 'json' && req.is('json')) return res.status(422).json({ errors });
     req.flash('error', errors.join(' ')); return res.redirect(back(req));
   }
-  if (out.status === 'done') { out.progress = 100; out.completed_at = today(); } else if (out.status && before.status === 'done') out.completed_at = null;
+  // progress follows the status: a done task is 100%, any other status is 0%
+  if (out.status === 'done') { out.progress = 100; out.completed_at = today(); } else if (out.status) { out.progress = 0; if (before.status === 'done') out.completed_at = null; }
   await db.update('tasks', before.id, out);
   const after = await db.get('SELECT * FROM tasks WHERE id = ?', before.id);
   // email notifications

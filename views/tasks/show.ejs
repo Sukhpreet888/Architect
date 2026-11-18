@@ -7,15 +7,13 @@
   <p class="muted"><%= task.description || 'No description.' %></p>
   <table class="small"><tr><td>Assignee</td><td><%= assignee ? assignee.name : 'Unassigned' %></td></tr><tr><td>Priority</td><td><%- badge(task.priority) %></td></tr>
   <tr><td>Dates</td><td><%= fmtDate(task.start_date) %> → <%= fmtDate(task.due_date) %> <% if (task.status !== 'done' && task.due_date && task.due_date < U.today()) { %><%- badge('overdue') %><% } %></td></tr>
-  <tr><td>Progress</td><td><div class="bar"><i style="width:<%= task.progress %>%"></i></div><%= task.progress %>%</td></tr>
   <tr><td>Depends on</td><td><%- dep ? `<a href="/projects/${project.id}/tasks/${dep.id}">${esc(dep.title)}</a> ${badge(dep.status)}` : '—' %></td></tr>
   <tr><td>Blocking</td><td><%- blocking.length ? blocking.map(b => `<a href="/projects/${project.id}/tasks/${b.id}">${esc(b.title)}</a>`).join(', ') : '—' %></td></tr>
   <tr><td>Documents</td><td><%- documents.length ? documents.map(d => `<a href="/projects/${project.id}/documents/${d.id}">${esc(d.title)}</a>`).join(', ') : '—' %></td></tr></table>
   <% if (open) { %>
-  <h3>Track progress</h3>
+  <h3>Update status</h3>
   <form method="post" action="<%= url %>" class="row" style="align-items:flex-end">
     <div><label>Status</label><select name="status"><% Object.entries(C.TASK_STATUSES).forEach(([k,v]) => { %><option value="<%= k %>" <%= task.status===k?'selected':'' %>><%= v %></option><% }) %></select></div>
-    <div><label>Progress %</label><input type="number" name="progress" min="0" max="100" value="<%= task.progress %>"></div>
     <div style="flex:0"><button class="btn">Update</button></div>
   </form><% } %>
 </div>
