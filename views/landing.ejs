@@ -1,8 +1,9 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ARCHFLOW — Architecture practice management</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>ARCHFLOW — Architecture practice management</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/static/style.css"></head>
 <body class="landing"><div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center"><b style="letter-spacing:.16em;color:#fff;font-size:18px">ARCHFLOW</b>
-  <div><a href="/login">Sign in</a> &nbsp; <a class="btn" href="/register">Start 15-day free trial</a></div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><a class="brand" href="/" style="display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700;font-size:18px;text-decoration:none"><%- logo() %> archflow</a>
+  <div><a href="/login" style="font-weight:600;margin-right:12px">Sign in</a><a class="btn" href="/register">Start 15-day free trial</a></div></div>
   <h1>Run every architecture project — from brief to handover — in one workspace.</h1>
   <p class="lead">Phase-based workflows, tasks, drawings with version history, client approvals, invoices and construction tracking. Reminders and notifications go out automatically by email — no apps for your clients to install.</p>
   <p><a class="btn" href="/register">Create your workspace</a></p>
@@ -14,10 +15,10 @@
     <div class="f"><b>Construction</b><p class="small">Budgets, expenditure approval, materials & reorder alerts, site visits and rectification tasks.</p></div>
     <div class="f"><b>Reports</b><p class="small">Project, organisation and financial reports with Excel and PDF export.</p></div>
   </div>
-  <h2 style="color:#fff;margin-top:48px">Pricing</h2>
+  <h2 style="margin-top:48px">Pricing</h2>
   <div class="plans">
   <% plans.forEach(p => { %><div class="plan"><h2 style="margin:0"><%= p.name %></h2><div class="p"><%= p.price ? '$' + p.price : 'Custom' %><span class="muted small"><%= p.price ? '/mo' : '' %></span></div>
   <ul><li><%= p.blurb %></li><li>All modules included</li><li>Email reminders everywhere</li></ul><a class="btn" href="/register">Start free trial</a></div><% }) %>
   </div>
-  <p class="small" style="margin-top:40px;color:#7f95b8">© ARCHFLOW</p>
+  <p class="small" style="margin-top:40px;color:var(--muted)">© ARCHFLOW</p>
 </div></body></html>

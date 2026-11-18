@@ -61,7 +61,7 @@ app.use((req, res, next) => {
   res.locals.flash = req.session.flash || [];
   req.session.flash = undefined;
   Object.assign(res.locals, {
-    U, C, fmtDate: U.fmtDate, fmtBytes: U.fmtBytes, esc: U.esc, path: req.path, query: req.query,
+    U, C, icon: require('./icons').icon, logo: require('./icons').logo, fmtDate: U.fmtDate, fmtBytes: U.fmtBytes, esc: U.esc, path: req.path, query: req.query,
     badge: (st, label) => {
       const cls = { completed: 'green', approved: 'green', paid: 'green', done: 'green', active: 'green', resolved: 'green', sent: 'green',
         in_progress: 'blue', issued: 'blue', in_review: 'blue', review: 'blue', pending: 'amber', submitted: 'blue', scheduled: 'blue', trial: 'blue', logged: 'blue',

@@ -25,7 +25,7 @@ await db.tx(async () => {
   await db.run("UPDATE tasks SET status = 'done', progress = 100 WHERE phase_id = ?", phases[0].id);
   await db.run("UPDATE deliverables SET status = 'approved' WHERE phase_id = ?", phases[0].id);
   for (const [i, t] of (await db.all('SELECT id FROM tasks WHERE project_id = ? AND status != ?', pid, 'done')).entries()) await db.run('UPDATE tasks SET assignee_id = ? WHERE id = ?', i % 2 ? team.architect : team.lead_architect, t.id);
-  await db.run("UPDATE tasks SET status = 'in_progress', progress = 40 WHERE phase_id = ?", phases[1].id);
+  await db.run("UPDATE tasks SET status = 'in_progress', progress = 0 WHERE phase_id = ?", phases[1].id);
   await db.insert('invoices', { org_id: orgId, project_id: pid, number: `MDS-${today().slice(0, 4)}-0001`, milestone: 'Advance — 10% of fee', amount: 120000, tax: 21600, issue_date: start, due_date: addDays(start, 15), status: 'paid', created_by: team.accountant });
   await db.insert('payments', { invoice_id: 1, amount: 141600, paid_on: addDays(start, 12), method: 'bank_transfer', reference: 'UTR4481', recorded_by: team.accountant });
   await db.insert('invoices', { org_id: orgId, project_id: pid, number: `MDS-${today().slice(0, 4)}-0002`, milestone: 'Concept approval — 20%', amount: 240000, tax: 43200, issue_date: addDays(today(), -20), due_date: addDays(today(), -4), status: 'overdue', created_by: team.accountant });

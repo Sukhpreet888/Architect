@@ -1,10 +1,10 @@
 <%- include('../partials/head') %>
 <div class="head"><div><h1>Projects</h1></div><% if (can('project_create')) { %><a class="btn" href="/projects/new">+ New project</a><% } %></div>
 <div class="seg" style="margin-bottom:12px"><a href="/projects" class="<%= status==='active'?'on':'' %>">Active</a><a href="/projects?status=closed" class="<%= status==='closed'?'on':'' %>">Completed / archived</a></div>
-<div class="card tablewrap"><table><tr><th>Project</th><th>Type</th><th>Scope</th><th>Manager</th><th>Current phase</th><th style="width:160px">Progress</th><th>Target end</th></tr>
-<% projects.forEach(p => { %><tr><td><a href="/projects/<%= p.id %>"><b><%= p.name %></b></a><div class="muted small"><%= p.code %><%= p.client_name ? ' · ' + p.client_name : '' %></div></td>
+<div class="card table-card"><div class="tablewrap"><table><tr><th>Project</th><th>Type</th><th>Scope</th><th>Manager</th><th>Current phase</th><th style="width:160px">Progress</th><th>Target end</th></tr>
+<% projects.forEach(p => { %><tr><td><a href="/projects/<%= p.id %>" style="color:var(--ink)"><b><%= p.name %></b></a><div class="muted small"><%= p.code %><%= p.client_name ? ' · ' + p.client_name : '' %></div></td>
 <td><%= C.PROJECT_TYPES[p.type] ? C.PROJECT_TYPES[p.type].name : p.type %><div class="muted small"><%= p.subtype %></div></td><td><%= C.SCOPES[p.scope] %></td><td><%= p.manager ? p.manager.name : '—' %></td>
 <td><%= p.prog.active ? p.prog.active.name : (p.status === 'closed' ? 'Closed' : p.prog.allComplete ? 'All complete' : '—') %></td>
-<td><div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div><span class="small muted"><%= p.prog.pct %>%</span></td><td class="nowrap"><%= fmtDate(p.end_date) %></td></tr><% }) %>
-<% if (!projects.length) { %><tr><td colspan="7" class="empty">No projects.</td></tr><% } %></table></div>
+<td><div class="mini-progress"><div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div><span><%= p.prog.pct %>%</span></div></td><td class="nowrap"><%= fmtDate(p.end_date) %></td></tr><% }) %>
+<% if (!projects.length) { %><tr><td colspan="7" class="empty">No projects.</td></tr><% } %></table></div></div>
 <%- include('../partials/foot') %>

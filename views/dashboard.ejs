@@ -1,43 +1,149 @@
 <%- include('partials/head') %>
-<div class="head"><div><h1>Organisation dashboard</h1><p class="muted">Welcome back, <%= user.name.split(' ')[0] %>.</p></div>
-<% if (can('project_create')) { %><a class="btn" href="/projects/new">+ New project</a><% } %></div>
-<div class="grid g4">
-  <div class="kpi"><div class="l">Active projects</div><div class="v"><%= projects.length %></div><div class="muted small">Limit <%= limits.projects %></div></div>
-  <div class="kpi <%= overdueTasks ? 'red' : '' %>"><div class="l">Overdue tasks</div><div class="v"><%= overdueTasks %></div><div class="muted small"><%= dueSoon %> due in 3 days</div></div>
-  <div class="kpi <%= myReviews.length ? 'amber' : '' %>"><div class="l">Reviews awaiting me</div><div class="v"><%= myReviews.length %></div></div>
-  <% if (pay) { %><div class="kpi"><div class="l">Collection rate</div><div class="v"><%= pay.collectionRate %>%</div><div class="muted small"><%= money(pay.overdue) %> overdue</div></div>
-  <% } else { %><div class="kpi"><div class="l">Emails sent today</div><div class="v"><%= emailsToday %></div></div><% } %>
+<%
+  const pct = (a, b) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0);
+  const taskPct = pct(taskTotals.done, taskTotals.total);
+  const atRisk = health.at_risk;
+  const HEALTH = [
+    ['on_track', 'In progress', '#0f8a5f'], ['not_started', 'Not started', '#98a2b3'],
+    ['at_risk', 'At risk (overdue work)', '#d4483d'], ['completed', 'Completed', '#2458b8'],
+  ];
+  const healthTotal = HEALTH.reduce((s, [k]) => s + health[k], 0);
+  const initials = (n) => n.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const dueLabel = (d) => (d < 0 ? `${-d}d late` : d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : `in ${d}d`);
+%>
+<div class="head greet">
+  <div><h1><%= greeting %>, <%= user.name.split(' ')[0] %> 👋</h1><p><%= dateLabel %></p></div>
+  <% if (can('project_create')) { %><a class="btn" href="/projects/new"><%- icon('plus') %> New project</a><% } %>
 </div>
-<div class="grid g2" style="margin-top:16px">
-  <div class="card"><h2>Active projects</h2>
-    <% if (!projects.length) { %><div class="empty">No projects yet.<% if (can('project_create')) { %> <a href="/projects/new">Create your first project</a>.<% } %></div><% } %>
-    <% projects.slice(0, 8).forEach(p => { %>
-      <div style="padding:8px 0;border-bottom:1px solid var(--line)">
-        <div style="display:flex;justify-content:space-between"><a href="/projects/<%= p.id %>"><b><%= p.name %></b></a><span class="muted small"><%= p.code %></span></div>
-        <div class="muted small"><%= p.prog.active ? p.prog.active.name : (p.prog.allComplete ? 'All phases complete' : '—') %> · <%= p.prog.pct %>%</div>
-        <div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div>
+
+<!-- KPI strip -->
+<div class="kpi-strip">
+  <div><div class="l">Active projects</div><div class="v"><%= projects.length %> <span class="pill"><%= closedCount %> completed</span></div><div class="sub">Plan limit <%= limits.projects %></div></div>
+  <div><div class="l">Average completion</div><div class="v"><%= avgPct %>%</div><div class="bar" style="margin-top:8px"><i style="width:<%= avgPct %>%"></i></div></div>
+  <div><div class="l">Tasks done</div><div class="v"><%= taskTotals.done %><small class="muted" style="font-size:14px;font-weight:500;margin-right:auto;margin-left:4px">/ <%= taskTotals.total %></small><span class="pill good"><%= taskPct %>%</span></div><div class="sub"><%= taskTotals.dueSoon %> due in 3 days</div></div>
+  <div><div class="l">Overdue tasks</div><div class="v"><%= taskTotals.overdue %> <span class="pill <%= taskTotals.overdue ? 'bad' : 'good' %>"><%= taskTotals.overdue ? 'Needs attention' : 'On track' %></span></div><div class="sub"><%= atRisk %> project<%= atRisk === 1 ? '' : 's' %> at risk</div></div>
+  <% if (pay) { %><div><div class="l">Collection rate</div><div class="v"><%= pay.collectionRate %>% <span class="pill <%= pay.overdue > 0 ? 'warn' : 'good' %>"><%= pay.overdue > 0 ? 'Overdue' : 'Healthy' %></span></div><div class="sub"><%= money(pay.overdue) %> overdue</div></div>
+  <% } else { %><div><div class="l">Reviews awaiting me</div><div class="v"><%= myReviews.length %> <span class="pill <%= myReviews.length ? 'warn' : 'good' %>"><%= myReviews.length ? 'Pending' : 'Clear' %></span></div><div class="sub">Approval requests</div></div><% } %>
+</div>
+
+<div class="dash-grid">
+<div>
+  <!-- Project performance -->
+  <div class="card">
+    <div class="card-head"><span class="chip-ico"><%- icon('trend') %></span><div class="grow"><h2>Project performance</h2><p>Aggregated across <%= projects.length %> active project<%= projects.length === 1 ? '' : 's' %></p></div>
+      <span class="pill <%= atRisk ? 'bad' : 'good' %>"><%= atRisk %> at risk</span></div>
+    <div class="grid g3">
+      <div class="metric"><div class="l">Task completion</div><div class="v"><%= taskPct %><small>%</small></div><div class="s"><%= taskTotals.done %> of <%= taskTotals.total %> tasks done</div><div class="bar"><i style="width:<%= taskPct %>%"></i></div></div>
+      <div class="metric"><div class="l">Construction budget used</div><% const bp = pct(spent, budget); %><div class="v"><%= budget ? bp : '—' %><% if (budget) { %><small>%</small><% } %></div>
+        <div class="s"><%= budget ? `${money(spent)} of ${money(budget)}` : 'No construction budgets yet' %></div><div class="bar <%= bp >= 100 ? 'bad' : bp >= 80 ? 'warn' : '' %>"><i style="width:<%= bp %>%"></i></div></div>
+      <% if (pay) { const billBase = fee || pay.receivable; const bpct = pct(received, billBase); %>
+      <div class="metric"><div class="l">Billing progress</div><div class="v"><%= billBase ? bpct : '—' %><% if (billBase) { %><small>%</small><% } %></div>
+        <div class="s"><%= billBase ? `${money(received)} of ${money(billBase)} ${fee ? 'fee' : 'invoiced'}` : 'No fees or invoices yet' %></div><div class="bar"><i style="width:<%= bpct %>%"></i></div></div>
+      <% } else { %>
+      <div class="metric"><div class="l">Average completion</div><div class="v"><%= avgPct %><small>%</small></div><div class="s">Across active projects</div><div class="bar"><i style="width:<%= avgPct %>%"></i></div></div>
+      <% } %>
+    </div>
+    <div class="card-foot"><span><%= projects.length %> active projects</span><% if (pay && fee) { %><span><%= money(fee) %> total fee</span><% } %><span style="color:<%= atRisk ? 'var(--red)' : 'inherit' %>"><%= atRisk %> at risk</span><span><%= taskTotals.overdue %> overdue tasks</span></div>
+  </div>
+
+  <div class="grid g2">
+    <!-- Project health -->
+    <div class="card">
+      <div class="card-head"><span class="chip-ico"><%- icon('reports') %></span><div class="grow"><h2>Project health</h2><p><%= healthTotal %> project<%= healthTotal === 1 ? '' : 's' %> in total</p></div></div>
+      <% if (healthTotal) { %>
+      <div class="stackbar" role="img" aria-label="Project health: <%= HEALTH.map(([k, l]) => `${l} ${health[k]}`).join(', ') %>">
+        <% HEALTH.forEach(([k, l, c]) => { if (health[k]) { %><i style="width:<%= pct(health[k], healthTotal) %>%;background:<%= c %>" title="<%= l %>: <%= health[k] %>"></i><% } }) %>
       </div>
-    <% }) %>
+      <% } %>
+      <% HEALTH.forEach(([k, l, c]) => { %>
+      <div class="legend-row" title="<%= l %>: <%= health[k] %>"><span class="dot" style="background:<%= c %>"></span><span><%= l %></span>
+        <div class="bar"><i style="width:<%= pct(health[k], healthTotal) %>%;background:<%= c %>"></i></div><span class="n"><%= health[k] %></span></div>
+      <% }) %>
+    </div>
+
+    <!-- Team workload -->
+    <div class="card">
+      <div class="card-head"><span class="chip-ico"><%- icon('team') %></span><div class="grow"><h2>Team workload</h2><p>Open tasks per person</p></div>
+        <a class="small" href="/org/team">Team</a></div>
+      <% team.forEach(m => { const o = Number(m.open_tasks), od = Number(m.overdue); %>
+      <div class="person" title="<%= m.name %>: <%= o %> open, <%= od %> overdue">
+        <span class="avatar"><%= initials(m.name) %></span>
+        <span><%= m.name %><span class="muted small" style="display:block"><%= C.ROLES[m.role] %></span></span>
+        <b class="small"><%= o %></b>
+        <div class="bar <%= od ? 'bad' : '' %>"><i style="width:<%= Math.round(o / maxOpen * 100) %>%"></i></div>
+        <span class="pill <%= od ? 'bad' : o ? 'good' : '' %>"><%= od ? `${od} overdue` : o ? 'On track' : 'Free' %></span>
+      </div>
+      <% }) %>
+      <% if (!team.length) { %><div class="empty">No team members yet.</div><% } %>
+    </div>
   </div>
-  <div class="card"><h2>My tasks</h2>
-    <% if (!myTasks.length) { %><div class="empty">Nothing assigned to you.</div><% } %>
-    <table><% myTasks.forEach(t => { %><tr><td><a href="/projects/<%= t.project_id %>/tasks/<%= t.id %>"><%= t.title %></a><div class="muted small"><%= t.code %> · <%= t.project_name %></div></td>
-      <td class="nowrap"><%= fmtDate(t.due_date) %> <% if (t.due_date && t.due_date < U.today()) { %><%- badge('overdue') %><% } %></td><td><%- badge(t.status) %></td></tr><% }) %></table>
+
+  <!-- Recent projects -->
+  <div class="card table-card">
+    <div class="card-head" style="padding:16px 20px 4px"><span class="chip-ico"><%- icon('projects') %></span><div class="grow"><h2>Recent projects</h2><p>Current phase and completion</p></div>
+      <a class="small" href="/projects">Show all →</a></div>
+    <div class="tablewrap"><table>
+      <tr><th>No</th><th>Project</th><th>Client / location</th><th>Current phase</th><th>Health</th><th style="width:170px">Progress</th></tr>
+      <% projects.slice(0, 6).forEach((p, i) => { %>
+      <tr><td class="muted"><%= i + 1 %></td><td><a href="/projects/<%= p.id %>" style="color:var(--ink);font-weight:600"><%= p.name %></a><div class="muted small"><%= p.code %></div></td>
+        <td class="small"><%= p.client_name || '—' %><div class="muted"><%= p.location || '' %></div></td>
+        <td class="small"><%= p.prog.active ? p.prog.active.name : (p.prog.allComplete ? 'All phases complete' : '—') %></td>
+        <td><%- p.health === 'at_risk' ? badge('overdue', 'At risk') : p.health === 'on_track' ? badge('in_progress') : badge('draft', 'Not started') %></td>
+        <td><div class="mini-progress"><div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div><span><%= p.prog.pct %>%</span></div></td></tr>
+      <% }) %>
+      <% if (!projects.length) { %><tr><td colspan="6" class="empty">No active projects.<% if (can('project_create')) { %> <a href="/projects/new">Create your first project</a>.<% } %></td></tr><% } %>
+    </table></div>
   </div>
-  <div class="card"><h2>Awaiting my review</h2>
-    <% if (!myReviews.length) { %><div class="empty">No pending reviews.</div><% } %>
-    <% myReviews.forEach(a => { %><div style="padding:6px 0;border-bottom:1px solid var(--line)"><a href="/projects/<%= a.project_id %>/approvals/<%= a.id %>"><%= a.title %></a> <span class="muted small">· <%= a.code %></span></div><% }) %>
+
+  <!-- Upcoming tasks -->
+  <div class="card table-card">
+    <div class="card-head" style="padding:16px 20px 4px"><span class="chip-ico"><%- icon('tasks') %></span><div class="grow"><h2>Upcoming tasks</h2><p>Open tasks by due date</p></div>
+      <a class="small" href="/tasks?scope=all">Show all →</a></div>
+    <div class="tablewrap"><table>
+      <tr><th>No</th><th>Task</th><th>Project</th><th>Assignee</th><th>Priority</th><th>Due date</th></tr>
+      <% upcomingTasks.forEach((t, i) => { const late = t.due_date && t.due_date < today; %>
+      <tr><td class="muted"><%= i + 1 %></td><td><a href="/projects/<%= t.project_id %>/tasks/<%= t.id %>" style="color:var(--ink);font-weight:500"><%= t.title %></a></td>
+        <td class="small"><%= t.project_name %></td><td class="small"><%= t.assignee || 'Unassigned' %></td><td><%- badge(t.priority) %></td>
+        <td class="nowrap small"><%= fmtDate(t.due_date) %><% if (late) { %> <%- badge('overdue') %><% } %></td></tr>
+      <% }) %>
+      <% if (!upcomingTasks.length) { %><tr><td colspan="6" class="empty">No open tasks.</td></tr><% } %>
+    </table></div>
   </div>
-  <% if (pay) { %><div class="card"><h2>Receivables</h2>
-    <div class="grid g2"><div><div class="muted small">Received</div><b><%= money(pay.received) %></b></div><div><div class="muted small">Outstanding</div><b><%= money(pay.pending + pay.overdue) %></b></div></div>
-    <h3>Overdue invoices</h3>
-    <% if (!overdueInvoices.length) { %><div class="muted">None 🎉</div><% } %>
-    <% overdueInvoices.forEach(i => { %><div><a href="/payments/invoices/<%= i.id %>"><%= i.number %></a> · <%= i.project_name %> · due <%= fmtDate(i.due_date) %></div><% }) %>
-  </div><% } %>
 </div>
-<div class="card"><h2>Modules</h2>
-<div class="grid g5 small">
-  <a href="/org/team">Organisation setup & team</a><a href="/projects/new">Create project</a><a href="/projects">Project execution</a><a href="/payments">Payments</a><a href="/tasks">Task management</a>
-  <a href="/projects">Documents & drawings</a><a href="/approvals">Approvals & reviews</a><a href="/projects">Construction</a><a href="/reports">Reports & analytics</a><a href="/billing">Billing & subscription</a>
-</div></div>
+
+<!-- right column -->
+<div>
+  <div class="card">
+    <div class="card-head"><span class="chip-ico"><%- icon('calendar') %></span><div class="grow"><h2>Upcoming deadlines</h2><p>Next 14 days · tasks, phases, visits<%= pay ? ', invoices' : '' %></p></div><span class="pill"><%= events.length %></span></div>
+    <% events.forEach(e => { const d = new Date(e.date + 'T00:00:00Z'); %>
+    <div class="event">
+      <div class="when"><b><%= d.getUTCDate() %></b><span><%= d.toLocaleDateString('en-GB', { month: 'short', timeZone: 'UTC' }) %></span></div>
+      <div class="what"><a href="<%= e.url %>"><%= e.title %></a><span class="muted"><%= e.kind %> · <%= e.sub %></span></div>
+      <span class="pill <%= e.days < 0 ? 'bad' : e.days <= 2 ? 'warn' : '' %>"><%= dueLabel(e.days) %></span>
+    </div>
+    <% }) %>
+    <% if (!events.length) { %><div class="empty">Nothing due in the next two weeks.</div><% } %>
+  </div>
+
+  <% if (myReviews.length) { %>
+  <div class="card">
+    <div class="card-head"><span class="chip-ico"><%- icon('approvals') %></span><div class="grow"><h2>Awaiting my review</h2><p>Approval requests</p></div><span class="pill warn"><%= myReviews.length %></span></div>
+    <% myReviews.forEach(a => { %><div class="event"><div class="what"><a href="/projects/<%= a.project_id %>/approvals/<%= a.id %>"><%= a.title %></a><span class="muted"><%= a.code %> · <%= a.project_name %></span></div></div><% }) %>
+  </div>
+  <% } %>
+
+  <% if (pay) { %>
+  <div class="card">
+    <div class="card-head"><span class="chip-ico"><%- icon('payments') %></span><div class="grow"><h2>Receivables</h2><p><%= money(pay.pending + pay.overdue) %> outstanding</p></div><a class="small" href="/payments">View all</a></div>
+    <div class="grid g2" style="margin-bottom:6px">
+      <div><div class="muted small">Received</div><b><%= money(pay.received) %></b></div>
+      <div><div class="muted small">Overdue</div><b style="color:<%= pay.overdue ? 'var(--red)' : 'inherit' %>"><%= money(pay.overdue) %></b></div>
+    </div>
+    <div class="bar" title="Collection rate <%= pay.collectionRate %>%"><i style="width:<%= pay.collectionRate %>%"></i></div>
+    <div class="muted small" style="margin:4px 0 6px">Collection rate <%= pay.collectionRate %>%</div>
+    <% overdueInvoices.forEach(i => { %><div class="event"><div class="what"><a href="/payments/invoices/<%= i.id %>"><%= i.number %></a><span class="muted"><%= i.project_name %> · due <%= fmtDate(i.due_date) %></span></div><%- badge('overdue') %></div><% }) %>
+  </div>
+  <% } %>
+</div>
+</div>
 <%- include('partials/foot') %>

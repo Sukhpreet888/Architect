@@ -1,42 +1,67 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title><%= title %> · ARCHFLOW</title><link rel="stylesheet" href="/static/style.css"></head>
+<title><%= title %> · ARCHFLOW</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+<script>try { if (localStorage.getItem('af-side') === 'collapsed') document.documentElement.classList.add('side-collapsed'); } catch (e) {}</script>
+</head>
 <body>
-<% if (org && user && user.email_verified) { const nav = (href, label, show = true) => show ? `<a href="${href}" class="${path === href || (href !== '/dashboard' && path.startsWith(href)) ? 'on' : ''}">${label}</a>` : ''; %>
+<% if (org && user && user.email_verified) {
+  const isOn = (href) => path === href || (href !== '/dashboard' && path.startsWith(href));
+  const nav = (href, ic, label, show = true) => show ? `<a href="${href}" class="${isOn(href) ? 'on' : ''}" title="${label}">${icon(ic)}<span>${label}</span></a>` : '';
+  const initials = user.name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const sections = [['/dashboard', 'Dashboard'], ['/projects', 'Projects'], ['/tasks', 'Task management'], ['/approvals', 'Approvals & reviews'], ['/payments', 'Payments'],
+    ['/reports', 'Reports & analytics'], ['/org/settings', 'Organisation setup'], ['/org/team', 'Team & roles'], ['/org/templates', 'Project templates'], ['/org/emails', 'Email log'], ['/billing', 'Billing & subscription'], ['/onboarding', 'Subscription']];
+  const section = sections.find(([p]) => isOn(p)); %>
 <div class="app">
   <aside class="side">
-    <div class="brand">ARCHFLOW<small><%= org.name %></small></div>
+    <a class="brand" href="/dashboard"><%- logo() %><span class="brand-text">archflow<small><%= org.name %></small></span></a>
     <nav>
-      <%- nav('/dashboard', 'Dashboard') %>
+      <%- nav('/dashboard', 'dashboard', 'Dashboard') %>
       <div class="sec">Work</div>
-      <%- nav('/projects', 'Projects') %>
-      <%- nav('/tasks', 'Task management') %>
-      <%- nav('/approvals', 'Approvals & reviews') %>
-      <%- nav('/payments', 'Payments', can('payments_view')) %>
-      <%- nav('/reports', 'Reports & analytics', can('reports_view')) %>
+      <%- nav('/projects', 'projects', 'Projects') %>
+      <%- nav('/tasks', 'tasks', 'Task management') %>
+      <%- nav('/approvals', 'approvals', 'Approvals & reviews') %>
+      <%- nav('/payments', 'payments', 'Payments', can('payments_view')) %>
+      <%- nav('/reports', 'reports', 'Reports & analytics', can('reports_view')) %>
       <div class="sec">Organisation</div>
-      <%- nav('/org/settings', 'Organisation setup', can('org_manage')) %>
-      <%- nav('/org/team', 'Team & roles') %>
-      <%- nav('/org/templates', 'Project templates') %>
-      <%- nav('/org/emails', 'Email log', can('org_manage')) %>
-      <%- nav('/billing', 'Billing & subscription', can('billing')) %>
+      <%- nav('/org/settings', 'settings', 'Organisation setup', can('org_manage')) %>
+      <%- nav('/org/team', 'team', 'Team & roles') %>
+      <%- nav('/org/templates', 'templates', 'Project templates') %>
+      <%- nav('/org/emails', 'mail', 'Email log', can('org_manage')) %>
+      <%- nav('/billing', 'billing', 'Billing & subscription', can('billing')) %>
     </nav>
     <div class="me">
-      <div><b><%= user.name %></b></div><div class="muted" style="color:#8ea3c4"><%= C.ROLES[role] %></div>
-      <% if (locals.orgs && orgs.length > 1) { %>
-      <form method="post" action="/switch-org" style="margin-top:6px"><select name="org_id" onchange="this.form.submit()"><% orgs.forEach(o => { %><option value="<%= o.id %>" <%= o.id === org.id ? 'selected' : '' %>><%= o.name %></option><% }) %></select></form>
-      <% } %>
-      <form method="post" action="/logout" style="margin-top:8px"><button class="btn sm grey">Sign out</button></form>
+      <span class="avatar"><%= initials %></span>
+      <div class="me-text"><b><%= user.name %></b><span><%= C.ROLES[role] %></span></div>
+      <button type="button" class="collapse-btn" title="Collapse / expand menu" aria-label="Collapse or expand the menu"
+        onclick="const c = document.documentElement.classList.toggle('side-collapsed'); try { localStorage.setItem('af-side', c ? 'collapsed' : 'open'); } catch (e) {}"><%- icon('chevron') %></button>
     </div>
   </aside>
   <div class="main">
+    <header class="topbar">
+      <div class="crumbs"><a href="/dashboard">Home</a><% if (section && section[0] !== '/dashboard' && section[1] !== title) { %> › <a href="<%= section[0] %>"><%= section[1] %></a><% } %> › <b><%= title %></b></div>
+      <details class="usermenu">
+        <summary><span class="avatar"><%= initials %></span><span class="um-name"><%= user.name %></span> <%- icon('down') %></summary>
+        <div class="menu">
+          <div class="who"><b><%= user.name %></b><div class="muted small"><%= user.email %></div><div class="muted small"><%= C.ROLES[role] %> · <%= org.name %></div></div>
+          <% if (locals.orgs && orgs.length > 1) { %>
+          <form method="post" action="/switch-org" style="padding:4px 10px 8px"><label class="small" style="margin:0 0 4px">Workspace</label><select name="org_id" onchange="this.form.submit()"><% orgs.forEach(o => { %><option value="<%= o.id %>" <%= o.id === org.id ? 'selected' : '' %>><%= o.name %></option><% }) %></select></form>
+          <% } %>
+          <a href="/org/team"><%- icon('team') %> Team & roles</a>
+          <% if (can('billing')) { %><a href="/billing"><%- icon('billing') %> Billing & subscription</a><% } %>
+          <form method="post" action="/logout"><button><%- icon('logout') %> Sign out</button></form>
+        </div>
+      </details>
+    </header>
     <% if (sub && sub.expired) { %><div class="banner red">Your subscription is inactive — the workspace is read-only. <% if (can('billing')) { %><a href="/billing/plans">Choose a plan</a><% } else { %>Ask your admin to choose a plan.<% } %></div>
     <% } else if (sub && sub.onTrial && sub.trialDaysLeft >= 0) { %><div class="banner">Free trial: <b><%= sub.trialDaysLeft %> day<%= sub.trialDaysLeft === 1 ? '' : 's' %></b> left<% if (org.plan) { %> on the <b><%= C.PLANS[org.plan].name %></b> plan<% } %> — no card needed until <%= fmtDate(org.trial_ends_at) %>.
       <% if (can('billing')) { %><% if (!org.plan) { %><a href="/billing/plans">Choose a plan</a><% } else if (!org.card_last4) { %><a href="/billing/checkout?plan=<%= org.plan %>">Add card for when the trial ends</a><% } else { %>Card on file: billing starts automatically.<% } %><% } %></div><% } %>
     <div class="content">
 <% } else { %>
 <div class="auth">
-  <div class="brand">ARCHFLOW</div>
+  <a class="brand" href="/"><%- logo() %> archflow</a>
 <% } %>
 <% flash.forEach(f => { %><div class="flash <%= f.type %>"><%= f.msg %></div><% }) %>
 <% if (locals.errors && errors.length) { %><div class="errors"><ul><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div><% } %>
