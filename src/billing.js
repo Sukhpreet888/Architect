@@ -34,22 +34,22 @@ function parseCard(body) {
   return { last4: digits.slice(-4), brand };
 }
 
-function record(orgId, kind, description, amount, status) {
-  db.insert('billing_events', { org_id: orgId, kind, description, amount, status });
+async function record(orgId, kind, description, amount, status) {
+  await db.insert('billing_events', { org_id: orgId, kind, description, amount, status });
 }
 
 /**
  * Activate a plan. During the trial the card is verified (zero-amount authorisation) and billing starts
  * when the trial ends; after the trial the first month is charged now.
  */
-function activatePlan(org, planKey, card, custom = {}) {
+async function activatePlan(org, planKey, card, custom = {}) {
   const plan = PLANS[planKey];
   if (!plan) return { ok: false, error: 'Unknown plan.' };
   const inTrial = org.plan_status === 'trial' && org.trial_ends_at >= today();
   const draft = { ...org, plan: planKey };
   const amount = inTrial ? 0 : monthlyAmount(draft);
   const res = provider.charge({ last4: card.last4, amount });
-  if (!res.ok) { record(org.id, 'payment', `${plan.name} plan activation`, amount, 'failed'); return { ok: false, error: res.error }; }
+  if (!res.ok) { await record(org.id, 'payment', `${plan.name} plan activation`, amount, 'failed'); return { ok: false, error: res.error }; }
   const update = {
     plan: planKey, card_last4: card.last4, card_brand: card.brand,
     plan_status: inTrial ? 'trial' : 'active',
@@ -58,35 +58,35 @@ function activatePlan(org, planKey, card, custom = {}) {
   if (planKey === 'enterprise') {
     update.custom_users = custom.users || 50; update.custom_projects = custom.projects || 200; update.custom_storage_mb = (custom.storageGb || 500) * 1024;
   }
-  db.update('orgs', org.id, update);
-  record(org.id, 'subscription', `${plan.name} plan ${inTrial ? 'selected (billing starts after trial)' : 'activated'}`, amount, 'paid');
+  await db.update('orgs', org.id, update);
+  await record(org.id, 'subscription', `${plan.name} plan ${inTrial ? 'selected (billing starts after trial)' : 'activated'}`, amount, 'paid');
   return { ok: true, amount, inTrial };
 }
 
 /** Charge the recurring amount for an org whose billing date has arrived. */
-function chargeRenewal(org) {
+async function chargeRenewal(org) {
   const amount = monthlyAmount(org);
   const res = provider.charge({ last4: org.card_last4, amount });
   if (!res.ok) {
-    db.update('orgs', org.id, { plan_status: 'past_due' });
-    record(org.id, 'renewal', `${PLANS[org.plan].name} plan renewal`, amount, 'failed');
+    await db.update('orgs', org.id, { plan_status: 'past_due' });
+    await record(org.id, 'renewal', `${PLANS[org.plan].name} plan renewal`, amount, 'failed');
     return { ok: false, error: res.error, amount };
   }
-  db.update('orgs', org.id, { plan_status: 'active', next_billing_date: addDays(org.next_billing_date || today(), 30) });
-  record(org.id, 'renewal', `${PLANS[org.plan].name} plan — monthly subscription`, amount, 'paid');
+  await db.update('orgs', org.id, { plan_status: 'active', next_billing_date: addDays(org.next_billing_date || today(), 30) });
+  await record(org.id, 'renewal', `${PLANS[org.plan].name} plan — monthly subscription`, amount, 'paid');
   return { ok: true, amount };
 }
 
-function buyAddon(org, key, qty) {
+async function buyAddon(org, key, qty) {
   const a = ADDONS[key];
   if (!a || !(qty >= 1)) return { ok: false, error: 'Invalid add-on.' };
   if (!org.card_last4) return { ok: false, error: 'Add a payment method first.' };
   const amount = a.price * qty;
   const res = provider.charge({ last4: org.card_last4, amount });
-  if (!res.ok) { record(org.id, 'addon', `${a.name} ×${qty}`, amount, 'failed'); return { ok: false, error: res.error }; }
+  if (!res.ok) { await record(org.id, 'addon', `${a.name} ×${qty}`, amount, 'failed'); return { ok: false, error: res.error }; }
   const col = key === 'users' ? 'extra_users' : key === 'projects' ? 'extra_projects' : 'extra_storage_mb';
-  db.run(`UPDATE orgs SET ${col} = ${col} + ? WHERE id = ?`, a.unit * qty, org.id);
-  record(org.id, 'addon', `${a.name} ${a.label} ×${qty} (monthly)`, amount, 'paid');
+  await db.run(`UPDATE orgs SET ${col} = ${col} + ? WHERE id = ?`, a.unit * qty, org.id);
+  await record(org.id, 'addon', `${a.name} ${a.label} ×${qty} (monthly)`, amount, 'paid');
   return { ok: true, amount, description: `${a.name} ×${qty}` };
 }
 

@@ -5,15 +5,15 @@ const PDFDocument = require('pdfkit');
 const db = require('./db');
 const S = require('./services');
 const { ROLES, TASK_STATUSES, INVOICE_STATUSES, EXPENSE_CATEGORIES, PROJECT_TYPES, SCOPES } = require('./config');
-const { today, daysBetween, fmtDate, fmtMoney } = require('./util');
+const { today, daysBetween, fmtDate, fmtMoney, mapSeq } = require('./util');
 
-function projectReport(org, project) {
-  const prog = S.phaseProgress(project.id);
+async function projectReport(org, project) {
+  const prog = await S.phaseProgress(project.id);
   const money = (n) => fmtMoney(n, org.currency);
-  const tasks = db.all(`SELECT t.*, u.name assignee, ph.name phase FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id LEFT JOIN phases ph ON ph.id = t.phase_id WHERE t.project_id = ? ORDER BY ph.seq, t.id`, project.id);
-  const approvals = db.all("SELECT a.*, u.name requester FROM approvals a LEFT JOIN users u ON u.id = a.requested_by WHERE project_id = ? AND status != 'draft' ORDER BY id", project.id);
-  const pay = S.paymentsSummary(org.id, project.id);
-  const invoices = db.all('SELECT * FROM invoices WHERE project_id = ? ORDER BY due_date', project.id);
+  const tasks = await db.all(`SELECT t.*, u.name assignee, ph.name phase FROM tasks t LEFT JOIN users u ON u.id = t.assignee_id LEFT JOIN phases ph ON ph.id = t.phase_id WHERE t.project_id = ? ORDER BY ph.seq, t.id`, project.id);
+  const approvals = await db.all("SELECT a.*, u.name requester FROM approvals a LEFT JOIN users u ON u.id = a.requested_by WHERE project_id = ? AND status != 'draft' ORDER BY id", project.id);
+  const pay = await S.paymentsSummary(org.id, project.id);
+  const invoices = await db.all('SELECT * FROM invoices WHERE project_id = ? ORDER BY due_date', project.id);
   const sections = [
     { heading: 'Summary', kpis: [
       ['Code', project.code], ['Client', project.client_name || '—'], ['Type', `${PROJECT_TYPES[project.type]?.name || project.type} — ${project.subtype || ''}`],
@@ -28,10 +28,10 @@ function projectReport(org, project) {
       rows: approvals.map((a) => [a.title, a.type, a.round, a.requester || '—', a.status.replace('_', ' ')]) } },
     { heading: 'Invoices & payments', kpis: [['Receivable', money(pay.receivable)], ['Received', money(pay.received)], ['Outstanding', money(pay.pending + pay.overdue)], ['Collection rate', `${pay.collectionRate}%`]],
       table: { columns: ['Invoice', 'Milestone', 'Due', 'Total', 'Paid', 'Balance', 'Status'],
-        rows: invoices.map((i) => { const t = S.invoiceTotals(i); return [i.number, i.milestone, fmtDate(i.due_date), money(t.total), money(t.paid), money(t.balance), INVOICE_STATUSES[i.status]]; }) } },
+        rows: await mapSeq(invoices, async (i) => { const t = await S.invoiceTotals(i); return [i.number, i.milestone, fmtDate(i.due_date), money(t.total), money(t.paid), money(t.balance), INVOICE_STATUSES[i.status]]; }) } },
   ];
   if (project.scope === 'design_construction') {
-    const exp = db.all("SELECT category, SUM(amount) s FROM expenditures WHERE project_id = ? AND status = 'approved' GROUP BY category", project.id);
+    const exp = await db.all("SELECT category, SUM(amount) s FROM expenditures WHERE project_id = ? AND status = 'approved' GROUP BY category", project.id);
     const spent = exp.reduce((a, e) => a + e.s, 0);
     sections.push({ heading: 'Construction cost — budget vs actual',
       kpis: [['Budget', money(project.construction_budget)], ['Approved spend', money(spent)], ['Variance', money(project.construction_budget - spent)]],
@@ -40,15 +40,15 @@ function projectReport(org, project) {
   return { title: `Project report — ${project.name}`, subtitle: `${org.name} · generated ${fmtDate(today())}`, sections };
 }
 
-function orgReport(org) {
+async function orgReport(org) {
   const money = (n) => fmtMoney(n, org.currency);
-  const projects = db.all('SELECT * FROM projects WHERE org_id = ? ORDER BY status, created_at DESC', org.id);
-  const team = db.all(`SELECT u.name, m.role,
+  const projects = await db.all('SELECT * FROM projects WHERE org_id = ? ORDER BY status, created_at DESC', org.id);
+  const team = await db.all(`SELECT u.name, m.role,
       (SELECT COUNT(*) FROM tasks t JOIN projects p ON p.id = t.project_id WHERE t.assignee_id = u.id AND p.org_id = m.org_id AND t.status != 'done') open_tasks,
       (SELECT COUNT(*) FROM tasks t JOIN projects p ON p.id = t.project_id WHERE t.assignee_id = u.id AND p.org_id = m.org_id AND t.status != 'done' AND t.due_date < ?) overdue,
       (SELECT COUNT(*) FROM tasks t JOIN projects p ON p.id = t.project_id WHERE t.assignee_id = u.id AND p.org_id = m.org_id AND t.status = 'done') done
     FROM memberships m JOIN users u ON u.id = m.user_id WHERE m.org_id = ? AND m.active = 1 ORDER BY u.name`, today(), org.id);
-  const exp = db.all(`SELECT p.code, p.name, p.construction_budget, COALESCE(SUM(CASE WHEN e.status = 'approved' THEN e.amount END),0) spent
+  const exp = await db.all(`SELECT p.code, p.name, p.construction_budget, COALESCE(SUM(CASE WHEN e.status = 'approved' THEN e.amount END),0) spent
     FROM projects p LEFT JOIN expenditures e ON e.project_id = p.id WHERE p.org_id = ? AND p.scope = 'design_construction' GROUP BY p.id`, org.id);
   const active = projects.filter((p) => p.status === 'active').length;
   return {
@@ -56,7 +56,7 @@ function orgReport(org) {
     sections: [
       { heading: 'Portfolio', kpis: [['Projects', projects.length], ['Active', active], ['Completed', projects.length - active], ['Team members', team.length]],
         table: { columns: ['Code', 'Project', 'Type', 'Scope', 'Status', 'Progress', 'Target end'],
-          rows: projects.map((p) => [p.code, p.name, PROJECT_TYPES[p.type]?.name || p.type, SCOPES[p.scope], p.status, `${S.phaseProgress(p.id).pct}%`, fmtDate(p.end_date)]) } },
+          rows: await mapSeq(projects, async (p) => [p.code, p.name, PROJECT_TYPES[p.type]?.name || p.type, SCOPES[p.scope], p.status, `${(await S.phaseProgress(p.id)).pct}%`, fmtDate(p.end_date)]) } },
       { heading: 'Team workload', table: { columns: ['Member', 'Role', 'Open tasks', 'Overdue', 'Completed'], rows: team.map((t) => [t.name, ROLES[t.role], t.open_tasks, t.overdue, t.done]) } },
       { heading: 'Construction expenditure', table: { columns: ['Code', 'Project', 'Budget', 'Approved spend', 'Utilisation'],
         rows: exp.map((e) => [e.code, e.name, money(e.construction_budget), money(e.spent), e.construction_budget ? `${Math.round((e.spent / e.construction_budget) * 100)}%` : '—']) } },
@@ -64,12 +64,12 @@ function orgReport(org) {
   };
 }
 
-function financialReport(org) {
+async function financialReport(org) {
   const money = (n) => fmtMoney(n, org.currency);
-  const sum = S.paymentsSummary(org.id);
+  const sum = await S.paymentsSummary(org.id);
   const t = today();
-  const invoices = db.all("SELECT i.*, p.name project, p.client_name FROM invoices i JOIN projects p ON p.id = i.project_id WHERE i.org_id = ? AND i.status != 'draft' ORDER BY i.due_date", org.id)
-    .map((i) => ({ ...i, ...S.invoiceTotals(i) }));
+  const invRows = await db.all("SELECT i.*, p.name project, p.client_name FROM invoices i JOIN projects p ON p.id = i.project_id WHERE i.org_id = ? AND i.status != 'draft' ORDER BY i.due_date", org.id);
+  const invoices = await mapSeq(invRows, async (i) => ({ ...i, ...await S.invoiceTotals(i) }));
   const buckets = { 'Not due': 0, '1–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
   for (const i of invoices) {
     if (i.balance <= 0) continue;
@@ -77,7 +77,7 @@ function financialReport(org) {
     const k = late <= 0 ? 'Not due' : late <= 30 ? '1–30 days' : late <= 60 ? '31–60 days' : late <= 90 ? '61–90 days' : '90+ days';
     buckets[k] += i.balance;
   }
-  const receipts = db.all(`SELECT pay.*, i.number, p.name project FROM payments pay JOIN invoices i ON i.id = pay.invoice_id JOIN projects p ON p.id = i.project_id
+  const receipts = await db.all(`SELECT pay.*, i.number, p.name project FROM payments pay JOIN invoices i ON i.id = pay.invoice_id JOIN projects p ON p.id = i.project_id
     WHERE i.org_id = ? ORDER BY pay.paid_on DESC`, org.id);
   return {
     title: `Financial report — ${org.name}`, subtitle: `Generated ${fmtDate(t)}`,

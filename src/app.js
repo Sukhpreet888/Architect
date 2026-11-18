@@ -51,23 +51,23 @@ app.use((req, res, next) => {
 });
 
 // load session user / organisation / role
-app.use((req, res, next) => {
+app.use(async (req, res, next) => {
   const uid = req.session.userId;
   if (!uid) return next();
-  const user = db.get('SELECT id, name, email, email_verified FROM users WHERE id = ?', uid);
+  const user = await db.get('SELECT id, name, email, email_verified FROM users WHERE id = ?', uid);
   if (!user) { req.session = null; return next(); }
   req.user = user; res.locals.user = user;
-  let m = req.session.orgId && db.get('SELECT * FROM memberships WHERE user_id = ? AND org_id = ? AND active = 1', uid, req.session.orgId);
-  if (!m) m = db.get('SELECT * FROM memberships WHERE user_id = ? AND active = 1 ORDER BY id LIMIT 1', uid);
+  let m = req.session.orgId && await db.get('SELECT * FROM memberships WHERE user_id = ? AND org_id = ? AND active = 1', uid, req.session.orgId);
+  if (!m) m = await db.get('SELECT * FROM memberships WHERE user_id = ? AND active = 1 ORDER BY id LIMIT 1', uid);
   if (m) {
     req.session.orgId = m.org_id;
-    req.org = db.get('SELECT * FROM orgs WHERE id = ?', m.org_id);
+    req.org = await db.get('SELECT * FROM orgs WHERE id = ?', m.org_id);
     req.role = m.role;
     req.can = (p) => S.can(req.role, p);
     req.sub = S.subscriptionState(req.org);
     Object.assign(res.locals, { org: req.org, role: req.role, can: req.can, sub: req.sub,
       money: (n) => U.fmtMoney(n, req.org.currency),
-      orgs: db.all('SELECT o.id, o.name FROM memberships m JOIN orgs o ON o.id = m.org_id WHERE m.user_id = ? AND m.active = 1', uid) });
+      orgs: await db.all('SELECT o.id, o.name FROM memberships m JOIN orgs o ON o.id = m.org_id WHERE m.user_id = ? AND m.active = 1', uid) });
   }
   next();
 });
@@ -90,6 +90,7 @@ app.use(require('./routes/closure'));
 app.use((req, res) => res.status(404).render('error', { title: 'Not found', code: 404, message: 'The page you are looking for does not exist.' }));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
+  if (err.code === '22P02' || err.code === '22003') err = Object.assign(new Error('Not found.'), { status: 404 }); // malformed id in URL
   if (err.status && err.status < 500) return res.status(err.status).render('error', { title: 'Error', code: err.status, message: err.message });
   console.error(err);
   res.status(500).render('error', { title: 'Error', code: 500, message: 'Something went wrong. Please try again.' });

@@ -3,17 +3,31 @@
 Practice & project management SaaS for architecture firms — built from the ARCHFLOW flowchart.
 **Email is the only notification and reminder channel, everywhere in the app** (no in-app, SMS or WhatsApp).
 
-Stack: Node.js 22 (built-in `node:sqlite`), Express 5, EJS server-rendered UI, Nodemailer, ExcelJS, PDFKit. No build step.
+Stack: Node.js 22, Express 5, EJS server-rendered UI, **Supabase** (PostgreSQL + Storage), Nodemailer, ExcelJS, PDFKit. No build step.
 
 ## Run
 
 ```bash
 npm install
-cp .env.example .env    # set SMTP_* to actually deliver email
+cp .env.example .env    # fill in DATABASE_URL / SUPABASE_* (and SMTP_* to deliver email)
 npm run seed            # optional demo workspace: admin@archflow.demo / password123
 npm start               # http://localhost:3000
-npm test                # end-to-end test of the whole flow
+npm test                # end-to-end test of the whole flow (uses an embedded Postgres, never your Supabase data)
 ```
+
+## Supabase
+
+| What | Where it lives |
+|---|---|
+| All app data (27 tables) | Supabase Postgres, schema **`archflow`** — see `db/schema.sql` |
+| Uploaded drawings, documents, payment proofs | Supabase Storage, **private** bucket `archflow-files` |
+
+- `DATABASE_URL` — Dashboard → **Connect** → *Session pooler* connection string (with your DB password). Use the session pooler (port 5432) or the direct connection; the app sets `search_path` per connection, which transaction-mode pooling (port 6543) does not keep.
+- `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` — Dashboard → Project Settings → API Keys. Server-side only.
+- The schema is created automatically on start-up (idempotent) and has also been applied as the migration `archflow_initial_schema`.
+- Security: the `archflow` schema is not exposed through Supabase's Data API, and every table has Row Level Security enabled with no policies, so the public `anon`/`authenticated` keys cannot read anything. Only the server (connecting as the table owner) can. Files are served through 60-second signed URLs after ARCHFLOW's own permission checks.
+- Without `DATABASE_URL`, an embedded Postgres (PGlite) in `DATA_DIR/pgdata` is used; without the Supabase keys, files are stored in `DATA_DIR/uploads`. Same code either way.
+- `DEBUG_SQL=1` prints every query.
 
 Without `SMTP_HOST`, emails are recorded in **Organisation → Email log** (and the console) instead of being delivered.
 The reminder scheduler runs inside the server every `REMINDER_INTERVAL_MINUTES` (default 60); you can also run it from an
@@ -56,4 +70,4 @@ reminder is sent once, and missed runs catch up without spamming.
 
 - Subscription payments use a simulated gateway (`src/billing.js` → `provider.charge`): any card number works except ones ending in `0002`, which are declined. Swap in Stripe/Razorpay there.
 - When the trial ends without a plan, or a renewal fails, the workspace becomes read-only until billing is fixed.
-- Data (SQLite DB and uploads) lives in `DATA_DIR` (default `./data`).
+- Supabase Auth is not used: ARCHFLOW keeps its own users, email verification and invitations (all by email).

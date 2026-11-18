@@ -51,28 +51,27 @@ async function send(msg) {
   const html = layout({ title: msg.title || msg.subject, ...msg });
   const text = toText({ title: msg.title || msg.subject, ...msg });
   const t = getTransport();
-  const results = [];
+  const ids = [];
   for (const to of recipients) {
-    const id = db.insert('email_log', {
+    ids.push({ to, id: await db.insert('email_log', {
       org_id: msg.orgId || null, to_email: to, subject: msg.subject, category: msg.category || 'general',
       body_html: html, status: t ? 'queued' : 'logged',
-    });
-    if (!t) {
-      if (process.env.NODE_ENV !== 'test') console.log(`[email:logged] to=${to} subject="${msg.subject}"`);
-      results.push({ id, status: 'logged' });
-      continue;
-    }
-    try {
-      await t.sendMail({ from: config.mail.from, to, subject: msg.subject, html, text });
-      db.run("UPDATE email_log SET status = 'sent' WHERE id = ?", id);
-      results.push({ id, status: 'sent' });
-    } catch (err) {
-      db.run("UPDATE email_log SET status = 'failed', error = ? WHERE id = ?", String(err.message || err), id);
-      console.error(`[email:failed] to=${to}: ${err.message}`);
-      results.push({ id, status: 'failed' });
+    }) });
+    if (!t && process.env.NODE_ENV !== 'test') console.log(`[email:logged] to=${to} subject="${msg.subject}"`);
+  }
+  // SMTP delivery happens in the background so requests never wait on the mail server.
+  if (t) {
+    for (const { to, id } of ids) {
+      db.outsideTx(() => t.sendMail({ from: config.mail.from, to, subject: msg.subject, html, text })
+        .then(() => db.run("UPDATE email_log SET status = 'sent' WHERE id = ?", id))
+        .catch((err) => {
+          console.error(`[email:failed] to=${to}: ${err.message}`);
+          return db.run("UPDATE email_log SET status = 'failed', error = ? WHERE id = ?", String(err.message || err), id);
+        })
+        .catch((e) => console.error('[email] log update failed', e.message)));
     }
   }
-  return results;
+  return ids;
 }
 
 module.exports = { send, layout };

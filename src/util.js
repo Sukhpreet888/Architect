@@ -88,7 +88,12 @@ function parseTemplate(body) {
   return { phases, errors };
 }
 
+/** Sequential async map / filter (keeps DB work ordered, safe inside a transaction). */
+async function mapSeq(list, fn) { const out = []; for (let i = 0; i < list.length; i++) out.push(await fn(list[i], i)); return out; }
+async function filterSeq(list, fn) { const out = []; for (let i = 0; i < list.length; i++) if (await fn(list[i], i)) out.push(list[i]); return out; }
+
 module.exports = {
+  mapSeq, filterSeq,
   hashPassword, checkPassword, token, today, setToday, addDays, daysBetween, fmtDate, fmtMoney, fmtBytes,
   esc, isEmail, num, int, arr, isDate, parseTemplate,
 };

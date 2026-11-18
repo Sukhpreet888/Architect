@@ -29,9 +29,9 @@ function requireOrg(req, res, next) {
 const perm = (p) => (req, res, next) => (req.can(p) ? next() : next(httpError(403, 'You do not have permission to do that.')));
 
 /** Load :pid as req.project (and res.locals.project) after checking access. */
-function loadProject(req, res, next) {
-  const project = db.get('SELECT * FROM projects WHERE id = ? AND org_id = ?', req.params.pid, req.org.id);
-  if (!project || !S.canAccessProject(project, req.user, req.role)) return next(httpError(404, 'Project not found.'));
+async function loadProject(req, res, next) {
+  const project = await db.get('SELECT * FROM projects WHERE id = ? AND org_id = ?', req.params.pid, req.org.id);
+  if (!project || !await S.canAccessProject(project, req.user, req.role)) return next(httpError(404, 'Project not found.'));
   req.project = project;
   res.locals.project = project;
   next();

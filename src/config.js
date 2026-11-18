@@ -12,7 +12,14 @@ const config = {
   appUrl: (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, ''),
   sessionSecret: process.env.SESSION_SECRET || 'archflow-dev-secret-change-me',
   dataDir: DATA_DIR,
-  dbFile: process.env.DB_FILE || path.join(DATA_DIR, 'archflow.db'),
+  // Supabase Postgres connection string (Dashboard → Connect → Session pooler). Empty = embedded local Postgres.
+  databaseUrl: process.env.DATABASE_URL || '',
+  // Supabase Storage for uploaded drawings/documents and payment proofs. Empty = local disk (DATA_DIR/uploads).
+  supabase: {
+    url: (process.env.SUPABASE_URL || '').replace(/\/$/, ''),
+    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    bucket: process.env.SUPABASE_BUCKET || 'archflow-files',
+  },
   uploadDir: path.join(DATA_DIR, 'uploads'),
   trialDays: 15,
   reminderIntervalMinutes: Number(process.env.REMINDER_INTERVAL_MINUTES || 60),
