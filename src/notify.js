@@ -22,8 +22,8 @@ const passwordReset = async (user, tok) => await send({
 });
 const workspaceCreated = async (org, user) => await send({
   to: user.email, orgId: org.id, category: 'billing', subject: `Your ${org.name} workspace is ready — 15-day free trial started`,
-  title: 'Workspace created', intro: `You are the Organisation Admin of ${org.name}. Your 15-day free trial is active.`,
-  rows: [['Trial ends', fmtDate(org.trial_ends_at)]], cta: { label: 'Choose a plan', url: url('/onboarding/plan') },
+  title: 'Workspace created', intro: `You are the Organisation Admin of ${org.name}. Your 15-day free trial is active — no card is needed until it ends. We'll email you before then to add your card details.`,
+  rows: [['Trial ends', fmtDate(org.trial_ends_at)]], cta: { label: 'Open your dashboard', url: url('/dashboard') },
 });
 const invite = async (org, inv, inviter) => await send({
   to: inv.email, orgId: org.id, category: 'team', subject: `${inviter.name} invited you to ${org.name} on ARCHFLOW`,
@@ -40,8 +40,11 @@ const subscriptionActivated = async (org) => {
   const plan = PLANS[org.plan];
   return await send({
     to: [org.billing_email, ...await S.emailsForRoles(org.id, ['admin'])], orgId: org.id, category: 'billing',
-    subject: `Subscription activated: ${plan.name} plan`, title: 'Subscription activated',
-    intro: org.plan_status === 'trial' ? `Your card will be charged automatically when your trial ends on ${fmtDate(org.trial_ends_at)}.` : 'Thank you — your subscription is active.',
+    subject: org.plan_status === 'trial' ? `Plan selected: ${plan.name}` : `Subscription activated: ${plan.name} plan`,
+    title: org.plan_status === 'trial' ? 'Plan selected' : 'Subscription activated',
+    intro: org.plan_status !== 'trial' ? 'Thank you — your subscription is active.'
+      : org.card_last4 ? `Your card will be charged automatically when your trial ends on ${fmtDate(org.trial_ends_at)}.`
+        : `Enjoy your free trial. No card is needed until it ends on ${fmtDate(org.trial_ends_at)} — we'll remind you to add one.`,
     rows: [['Plan', plan.name], ['Price', plan.price ? `$${plan.price}/month` : 'Custom'], ['Card', org.card_last4 ? `•••• ${org.card_last4}` : '—']],
     cta: { label: 'View billing', url: url('/billing') },
   });
@@ -56,13 +59,18 @@ const billingReceipt = async (org, description, amount) => await send({
   subject: `Receipt: ${description}`, title: 'Payment receipt', rows: [['Item', description], ['Amount', `$${Number(amount).toFixed(2)}`]],
   cta: { label: 'Billing history', url: url('/billing') },
 });
-const trialReminder = async (org, daysLeft) => await send({
-  to: [org.billing_email, ...await S.emailsForRoles(org.id, ['admin'])], orgId: org.id, category: 'billing',
-  subject: daysLeft > 0 ? `Your ARCHFLOW trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}` : 'Your ARCHFLOW trial has ended',
-  title: daysLeft > 0 ? 'Trial ending soon' : 'Trial ended',
-  intro: daysLeft > 0 ? 'Choose a plan to keep your projects running without interruption.' : 'Your workspace is now read-only until you activate a plan.',
-  cta: { label: 'Choose a plan', url: url('/billing/plans') },
-});
+const trialReminder = async (org, daysLeft) => {
+  const addCardUrl = url(org.plan ? `/billing/checkout?plan=${org.plan}` : '/billing/plans');
+  return await send({
+    to: [org.billing_email, ...await S.emailsForRoles(org.id, ['admin'])], orgId: org.id, category: 'billing',
+    subject: daysLeft > 0 ? `Your ARCHFLOW trial ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'} — add your card details` : daysLeft === 0 ? 'Your ARCHFLOW trial ends today — add your card details' : 'Your ARCHFLOW trial has ended — add your card to continue',
+    title: daysLeft >= 0 ? 'Trial ending soon' : 'Trial ended',
+    intro: daysLeft >= 0
+      ? `Your free trial ends on ${fmtDate(org.trial_ends_at)}. Add your card details${org.plan ? '' : ' and choose a plan'} to keep your projects running without interruption.`
+      : 'Your workspace is now read-only. Add your card details to activate your plan and continue where you left off.',
+    cta: { label: 'Add card details', url: addCardUrl },
+  });
+};
 const renewalReminder = async (org, amount) => await send({
   to: [org.billing_email, ...await S.emailsForRoles(org.id, ['admin'])], orgId: org.id, category: 'billing',
   subject: `Your ARCHFLOW subscription renews on ${fmtDate(org.next_billing_date)}`, title: 'Upcoming renewal',

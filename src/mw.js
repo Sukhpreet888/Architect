@@ -15,8 +15,12 @@ function requireOrg(req, res, next) {
   requireAuth(req, res, () => {
     if (!req.org) return res.redirect('/onboarding/workspace');
     const p = req.originalUrl.split('?')[0];
-    if (req.sub.needsPlan && req.role === 'admin' && !p.startsWith('/billing') && !p.startsWith('/onboarding')) {
-      return res.redirect('/onboarding/plan');
+    // Trial over without a card on file: the admin is sent to add one (plan + card) before continuing.
+    if (req.sub.expired && req.role === 'admin' && req.method === 'GET' && !p.startsWith('/billing') && !p.startsWith('/onboarding')) {
+      req.flash('error', req.sub.onTrial
+        ? 'Your free trial has ended. Add your card details to continue using ARCHFLOW.'
+        : 'Your subscription is inactive. Update your card details to continue.');
+      return res.redirect(req.org.plan ? `/billing/checkout?plan=${req.org.plan}` : '/billing/plans');
     }
     if (req.sub.expired && req.method !== 'GET' && !p.startsWith('/billing') && !p.startsWith('/onboarding')) {
       req.flash('error', 'Your subscription is inactive — the workspace is read-only. Choose a plan to continue.');

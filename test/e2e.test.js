@@ -72,22 +72,25 @@ test('ARCHFLOW full flow', async (t) => {
     let r = await admin.get('/dashboard');
     assert.equal(r.location, '/onboarding/workspace');
     r = await admin.post('/onboarding/workspace', { name: 'Studio Asha', currency: 'INR', area_unit: 'sqft', billing_email: 'billing@studio.test' });
-    assert.equal(r.location, '/onboarding/plan');
+    assert.equal(r.location, '/dashboard', 'straight into the app — no card or plan needed during the trial');
     const org = await db.get('SELECT * FROM orgs');
     S.orgId = org.id;
     assert.equal(org.plan_status, 'trial');
     assert.equal(U.daysBetween(U.today(), org.trial_ends_at), 15);
     assert.equal((await db.get('SELECT role FROM memberships WHERE user_id = ?', S.adminId)).role, 'admin');
     r = await admin.get('/dashboard');
-    assert.equal(r.location, '/onboarding/plan', 'admin must select plan');
-    // declined card -> retry / choose another plan
+    assert.equal(r.status, 200, 'not forced to the plan page during the trial');
+    assert.match(r.text, /no card needed until/);
+    // choose a plan during the trial WITHOUT a card
+    r = await admin.post('/billing/checkout', { plan: 'studio', onboarding: '1' });
+    assert.equal(r.location, '/dashboard');
+    let o = await db.get('SELECT plan, card_last4, plan_status FROM orgs');
+    assert.deepEqual([o.plan, o.card_last4, o.plan_status], ['studio', null, 'trial']);
+    // a card is optional during the trial, but if one is entered it is verified (declined card -> retry)
     r = await admin.post('/billing/checkout', { plan: 'studio', onboarding: '1', card_number: '4000000000000002', card_expiry: '12/30', card_cvc: '123' });
     assert.equal(r.location, '/onboarding/plan');
-    assert.equal((await db.get('SELECT plan FROM orgs')).plan, null);
+    assert.equal((await db.get('SELECT card_last4 FROM orgs')).card_last4, null);
     assert.ok((await emails("subject = 'Subscription payment failed'")).length);
-    r = await admin.post('/billing/checkout', { plan: 'studio', onboarding: '1', card_number: '4242424242424242', card_expiry: '12/30', card_cvc: '123' });
-    assert.equal(r.location, '/dashboard');
-    assert.equal((await db.get('SELECT plan FROM orgs')).plan, 'studio');
     r = await admin.get('/dashboard');
     assert.equal(r.status, 200);
     assert.match(r.text, /Organisation dashboard/);
@@ -363,18 +366,36 @@ test('ARCHFLOW full flow', async (t) => {
     assert.ok(!await db.get("SELECT 1 FROM tasks WHERE title = 'late'"), 'archived project is read-only');
   });
 
-  await t.test('billing: add-on, trial conversion, renewal reminder, failed renewal -> read-only', async () => {
-    let r = await admin.post('/billing/addon', { addon: 'users', qty: '2' });
+  await t.test('billing: card asked only when trial ends, add-on, renewal, failed renewal -> read-only', async () => {
+    const org = await db.get('SELECT * FROM orgs');
+    assert.equal(org.card_last4, null, 'whole trial used without a card');
+    // 3 days before the end: email asking for card details
+    U.setToday(U.addDays(org.trial_ends_at, -3)); let b = await lastId(); await runReminders();
+    assert.ok((await emails("id > ? AND subject LIKE '%trial ends in 3 days — add your card details%'", b)).length);
+    // trial over, still no card: workspace becomes read-only, admin is sent to add a card
+    U.setToday(U.addDays(org.trial_ends_at, 1)); b = await lastId(); await runReminders();
+    assert.equal((await db.get('SELECT plan_status FROM orgs')).plan_status, 'trial');
+    assert.ok((await emails("id > ? AND subject LIKE '%trial has ended — add your card%'", b)).length);
+    let r = await admin.get('/dashboard');
+    assert.equal(r.location, '/billing/checkout?plan=studio', 'admin asked for card once trial ends');
+    r = await pm.post(`/projects/${S.pid2}/tasks`, { title: 'blocked' });
+    assert.equal(r.location, '/billing', 'read-only for everyone until a card is added');
+    r = await admin.post('/billing/checkout', { plan: 'studio' });
+    assert.equal((await db.get('SELECT plan_status FROM orgs')).plan_status, 'trial', 'card required after trial');
+    b = await lastId();
+    r = await admin.post('/billing/checkout', { plan: 'studio', card_number: '4242424242424242', card_expiry: '12/30', card_cvc: '123' });
+    assert.equal(r.location, '/billing');
+    const after = await db.get('SELECT * FROM orgs');
+    assert.equal(after.plan_status, 'active');
+    assert.equal(after.card_last4, '4242');
+    assert.ok((await emails("id > ? AND subject LIKE 'Receipt:%'", b)).length, 'first month charged');
+    r = await admin.get('/dashboard');
+    assert.equal(r.status, 200);
+    // add-on applies new limits
+    r = await admin.post('/billing/addon', { addon: 'users', qty: '2' });
     assert.equal((await db.get('SELECT extra_users FROM orgs')).extra_users, 2);
     r = await admin.post('/org/invite', { email: 'six@studio.test', role: 'architect' });
     assert.ok(await db.get("SELECT 1 FROM invites WHERE email = 'six@studio.test'"), 'new limit applied');
-    const org = await db.get('SELECT * FROM orgs');
-    U.setToday(U.addDays(org.trial_ends_at, -3)); let b = await lastId(); await runReminders();
-    assert.ok((await emails("id > ? AND subject LIKE '%trial ends in 3 days%'", b)).length);
-    U.setToday(U.addDays(org.trial_ends_at, 1)); b = await lastId(); await runReminders();
-    const after = await db.get('SELECT * FROM orgs');
-    assert.equal(after.plan_status, 'active');
-    assert.ok((await emails("id > ? AND subject LIKE 'Receipt:%'", b)).length);
     U.setToday(U.addDays(after.next_billing_date, -2)); b = await lastId(); await runReminders();
     assert.ok((await emails("id > ? AND subject LIKE '%renews on%'", b)).length);
     // make the card fail on renewal

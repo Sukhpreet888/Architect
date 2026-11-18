@@ -6,7 +6,7 @@ const B = require('../billing');
 const S = require('../services');
 const { PLANS, config } = require('../config');
 const { requireAuth, requireOrg, perm } = require('../mw');
-const { addDays, today, int } = require('../util');
+const { addDays, today, int, fmtDate } = require('../util');
 
 router.get('/onboarding/workspace', requireAuth, (req, res) => {
   res.render('onboarding/workspace', { title: 'Create your workspace', form: { billing_email: req.user.email } });
@@ -26,8 +26,8 @@ router.post('/onboarding/workspace', requireAuth, async (req, res) => {
   });
   req.session.orgId = orgId;
   await N.workspaceCreated(await db.get('SELECT * FROM orgs WHERE id = ?', orgId), req.user);
-  req.flash('success', `Workspace created. Your ${config.trialDays}-day free trial is active.`);
-  res.redirect('/onboarding/plan');
+  req.flash('success', `Workspace created. Your ${config.trialDays}-day free trial is active — no card needed until it ends.`);
+  res.redirect('/dashboard');
 });
 
 // ---- plan selection & checkout (shared by onboarding and billing upgrades)
@@ -51,9 +51,11 @@ router.post('/billing/checkout', requireOrg, perm('billing'), async (req, res) =
   if (usage.users > limits.users || usage.projects > limits.projects) {
     return fail(`The ${plan.name} plan allows ${limits.users} users and ${limits.projects} active projects, but you currently use ${usage.users} users and ${usage.projects} projects.`);
   }
-  let card;
+  // During the free trial the card is optional (it is required once the trial ends).
+  let card = null;
+  const cardEntered = String(req.body.card_number || '').replace(/\D/g, '').length > 0;
   if (req.body.use_saved === '1' && req.org.card_last4) card = { last4: req.org.card_last4, brand: req.org.card_brand };
-  else { card = B.parseCard(req.body); if (card.error) return fail(card.error); }
+  else if (cardEntered || !B.trialActive(req.org)) { card = B.parseCard(req.body); if (card.error) return fail(card.error); }
   const result = await B.activatePlan(req.org, plan.key, card, custom);
   const org = await db.get('SELECT * FROM orgs WHERE id = ?', req.org.id);
   if (!result.ok) {
@@ -63,7 +65,11 @@ router.post('/billing/checkout', requireOrg, perm('billing'), async (req, res) =
   }
   await N.subscriptionActivated(org);
   if (result.amount > 0) await N.billingReceipt(org, `${plan.name} plan — first month`, result.amount);
-  req.flash('success', `${plan.name} plan activated${result.inTrial ? ' — billing starts when your trial ends' : ''}. New limits applied.`);
+  const fresh = await db.get('SELECT card_last4 FROM orgs WHERE id = ?', req.org.id);
+  const note = !result.inTrial ? '' : fresh.card_last4
+    ? ` — billing starts when your trial ends on ${fmtDate(req.org.trial_ends_at)}`
+    : ` — no card needed until your trial ends on ${fmtDate(req.org.trial_ends_at)}`;
+  req.flash('success', `${plan.name} plan ${result.inTrial ? 'selected' : 'activated'}${note}. New limits applied.`);
   res.redirect(onboarding ? '/dashboard' : '/billing');
 });
 

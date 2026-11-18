@@ -31,8 +31,10 @@ function subscriptionState(org) {
   const t = today();
   const trialDaysLeft = daysBetween(t, org.trial_ends_at);
   const onTrial = org.plan_status === 'trial';
-  const expired = (onTrial && trialDaysLeft < 0) || org.plan_status === 'past_due' || org.plan_status === 'cancelled';
-  return { onTrial, trialDaysLeft, expired, needsPlan: !org.plan };
+  // A finished trial with a plan AND a card on file is just waiting for the billing job to convert it.
+  const awaitingConversion = onTrial && trialDaysLeft < 0 && !!org.plan && !!org.card_last4;
+  const expired = (onTrial && trialDaysLeft < 0 && !awaitingConversion) || org.plan_status === 'past_due' || org.plan_status === 'cancelled';
+  return { onTrial, trialDaysLeft, expired, needsPlan: !org.plan, needsCard: !org.card_last4 };
 }
 
 // ---------------------------------------------------------------- people

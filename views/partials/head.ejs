@@ -31,7 +31,8 @@
   </aside>
   <div class="main">
     <% if (sub && sub.expired) { %><div class="banner red">Your subscription is inactive — the workspace is read-only. <% if (can('billing')) { %><a href="/billing/plans">Choose a plan</a><% } else { %>Ask your admin to choose a plan.<% } %></div>
-    <% } else if (sub && sub.onTrial) { %><div class="banner">Free trial: <b><%= sub.trialDaysLeft %> day<%= sub.trialDaysLeft === 1 ? '' : 's' %></b> left<% if (org.plan) { %> on the <b><%= C.PLANS[org.plan].name %></b> plan — billing starts <%= fmtDate(org.trial_ends_at) %><% } %>. <% if (can('billing') && !org.plan) { %><a href="/onboarding/plan">Select a plan</a><% } %></div><% } %>
+    <% } else if (sub && sub.onTrial && sub.trialDaysLeft >= 0) { %><div class="banner">Free trial: <b><%= sub.trialDaysLeft %> day<%= sub.trialDaysLeft === 1 ? '' : 's' %></b> left<% if (org.plan) { %> on the <b><%= C.PLANS[org.plan].name %></b> plan<% } %> — no card needed until <%= fmtDate(org.trial_ends_at) %>.
+      <% if (can('billing')) { %><% if (!org.plan) { %><a href="/billing/plans">Choose a plan</a><% } else if (!org.card_last4) { %><a href="/billing/checkout?plan=<%= org.plan %>">Add card for when the trial ends</a><% } else { %>Card on file: billing starts automatically.<% } %><% } %></div><% } %>
     <div class="content">
 <% } else { %>
 <div class="auth">

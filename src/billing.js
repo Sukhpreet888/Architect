@@ -38,20 +38,27 @@ async function record(orgId, kind, description, amount, status) {
   await db.insert('billing_events', { org_id: orgId, kind, description, amount, status });
 }
 
+const trialActive = (org) => org.plan_status === 'trial' && org.trial_ends_at >= today();
+
 /**
- * Activate a plan. During the trial the card is verified (zero-amount authorisation) and billing starts
- * when the trial ends; after the trial the first month is charged now.
+ * Activate a plan.
+ * - During the free trial a card is OPTIONAL: the plan is simply selected (a card, if given, is verified with a
+ *   zero-amount authorisation). Billing starts when the trial ends, and the card is required then.
+ * - After the trial a card is required and the first month is charged now.
  */
 async function activatePlan(org, planKey, card, custom = {}) {
   const plan = PLANS[planKey];
   if (!plan) return { ok: false, error: 'Unknown plan.' };
-  const inTrial = org.plan_status === 'trial' && org.trial_ends_at >= today();
+  const inTrial = trialActive(org);
+  if (!card && !inTrial) return { ok: false, error: 'Your free trial has ended — add a card to activate the plan.' };
   const draft = { ...org, plan: planKey };
   const amount = inTrial ? 0 : monthlyAmount(draft);
-  const res = provider.charge({ last4: card.last4, amount });
-  if (!res.ok) { await record(org.id, 'payment', `${plan.name} plan activation`, amount, 'failed'); return { ok: false, error: res.error }; }
+  if (card) {
+    const res = provider.charge({ last4: card.last4, amount });
+    if (!res.ok) { await record(org.id, 'payment', `${plan.name} plan activation`, amount, 'failed'); return { ok: false, error: res.error }; }
+  }
   const update = {
-    plan: planKey, card_last4: card.last4, card_brand: card.brand,
+    plan: planKey, ...(card ? { card_last4: card.last4, card_brand: card.brand } : {}),
     plan_status: inTrial ? 'trial' : 'active',
     next_billing_date: inTrial ? org.trial_ends_at : addDays(today(), 30),
   };
@@ -59,7 +66,7 @@ async function activatePlan(org, planKey, card, custom = {}) {
     update.custom_users = custom.users || 50; update.custom_projects = custom.projects || 200; update.custom_storage_mb = (custom.storageGb || 500) * 1024;
   }
   await db.update('orgs', org.id, update);
-  await record(org.id, 'subscription', `${plan.name} plan ${inTrial ? 'selected (billing starts after trial)' : 'activated'}`, amount, 'paid');
+  await record(org.id, 'subscription', `${plan.name} plan ${inTrial ? (card ? 'selected (billing starts after trial)' : 'selected — add a card before the trial ends') : 'activated'}`, amount, 'paid');
   return { ok: true, amount, inTrial };
 }
 
@@ -90,4 +97,4 @@ async function buyAddon(org, key, qty) {
   return { ok: true, amount, description: `${a.name} ×${qty}` };
 }
 
-module.exports = { provider, monthlyAmount, parseCard, activatePlan, chargeRenewal, buyAddon, record };
+module.exports = { provider, trialActive, monthlyAmount, parseCard, activatePlan, chargeRenewal, buyAddon, record };

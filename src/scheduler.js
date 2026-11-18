@@ -93,8 +93,11 @@ async function subscriptionJobs() {
       sent += await once('org', org.id, `trial_convert_${org.trial_ends_at}`, async () => (res.ok ? await N.billingReceipt(fresh, 'Subscription started after free trial', res.amount) : await N.paymentFailed(fresh, res.error)));
       continue;
     }
-    if (left === 3 || left === 1) sent += await once('org', org.id, `trial_${left}`, async () => await N.trialReminder(org, left));
-    if (left < 0) sent += await once('org', org.id, 'trial_expired', async () => await N.trialReminder(org, 0));
+    if (org.card_last4) continue; // card already on file: billing starts automatically, no reminder needed
+    // ask for card details 3 days and 1 day before the trial ends, and once it has ended
+    if (left <= 3 && left > 1) sent += await once('org', org.id, `trial_3_${org.trial_ends_at}`, async () => await N.trialReminder(org, left));
+    else if (left <= 1 && left >= 0) sent += await once('org', org.id, `trial_1_${org.trial_ends_at}`, async () => await N.trialReminder(org, left));
+    else if (left < 0) sent += await once('org', org.id, `trial_expired_${org.trial_ends_at}`, async () => await N.trialReminder(org, -1));
   }
   for (const org of await db.all("SELECT * FROM orgs WHERE plan_status = 'active' AND next_billing_date IS NOT NULL")) {
     const left = daysBetween(t, org.next_billing_date);

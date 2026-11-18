@@ -1,7 +1,10 @@
 <%- include('../partials/head') %>
 <div class="grid g2">
 <div class="card">
-  <h2>Activate the <%= plan.name %> plan</h2>
+  <% const inTrial = sub.onTrial && !sub.expired && sub.trialDaysLeft >= 0; %>
+  <h2><%= inTrial ? 'Choose' : 'Activate' %> the <%= plan.name %> plan</h2>
+  <% if (inTrial) { %><div class="flash success">You're on your free trial (<%= sub.trialDaysLeft %> day<%= sub.trialDaysLeft === 1 ? '' : 's' %> left). <b>No card needed now</b> — you'll be asked for card details when the trial ends on <%= fmtDate(org.trial_ends_at) %>. You can add one now if you prefer.</div>
+  <% } else { %><div class="flash error">Your free trial has ended. Add your card details to activate the plan and continue using ARCHFLOW.</div><% } %>
   <form method="post" action="/billing/checkout">
     <input type="hidden" name="plan" value="<%= plan.key %>"><input type="hidden" name="onboarding" value="<%= onboarding ? 1 : 0 %>">
     <% if (plan.key === 'enterprise') { %>
@@ -11,10 +14,10 @@
       <p class="muted small">Enterprise pricing is agreed with sales; limits apply immediately.</p>
     <% } %>
     <% if (org.card_last4) { %><label><input type="checkbox" name="use_saved" value="1" checked> Use saved <%= org.card_brand %> •••• <%= org.card_last4 %></label><% } %>
-    <label>Card number</label><input name="card_number" inputmode="numeric" placeholder="4242 4242 4242 4242">
+    <label>Card number <% if (inTrial) { %><span class="muted">(optional during the trial)</span><% } %></label><input name="card_number" inputmode="numeric" placeholder="4242 4242 4242 4242" <%= inTrial || org.card_last4 ? '' : 'required' %>>
     <div class="row"><div><label>Expiry (MM/YY)</label><input name="card_expiry" placeholder="12/29"></div><div><label>CVC</label><input name="card_cvc" placeholder="123"></div></div>
     <p class="muted small">Demo payment gateway: any card works except numbers ending in 0002 (declined).</p>
-    <p><button class="btn">Activate subscription</button> <a class="btn grey" href="<%= onboarding ? '/onboarding/plan' : '/billing/plans' %>">Choose another plan</a></p>
+    <p><button class="btn"><%= inTrial ? 'Continue with ' + plan.name : 'Add card & activate' %></button> <a class="btn grey" href="<%= onboarding ? '/onboarding/plan' : '/billing/plans' %>">Choose another plan</a></p>
   </form>
 </div>
 <div class="card">
