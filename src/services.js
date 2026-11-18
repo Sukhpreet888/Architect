@@ -133,13 +133,26 @@ async function createProjectWithWorkflow(orgId, userId, data, memberIds) {
 
 async function phaseProgress(projectId) {
   const phases = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', projectId);
+  // Per-phase completion = average progress of the phase's tasks (a done task counts as 100%).
+  // A phase marked completed is 100%; a phase with no tasks yet is 0% until it is completed.
+  const rows = await db.all(`SELECT phase_id, COUNT(*) total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) done,
+      AVG(CASE WHEN status = 'done' THEN 100 ELSE progress END) avg_progress
+    FROM tasks WHERE project_id = ? AND phase_id IS NOT NULL GROUP BY phase_id`, projectId);
+  const byPhase = Object.fromEntries(rows.map((r) => [r.phase_id, r]));
+  for (const p of phases) {
+    const s = byPhase[p.id] || { total: 0, done: 0, avg_progress: 0 };
+    p.tasks_total = Number(s.total) || 0;
+    p.tasks_done = Number(s.done) || 0;
+    p.pct = p.status === 'na' ? null : p.status === 'completed' ? 100 : Math.min(100, Math.round(Number(s.avg_progress) || 0));
+  }
   const applicable = phases.filter((p) => p.status !== 'na');
   const done = applicable.filter((p) => p.status === 'completed').length;
   const taskStats = await db.get("SELECT COUNT(*) total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) done FROM tasks WHERE project_id = ?", projectId);
   return {
     phases, applicable: applicable.length, done,
     active: phases.find((p) => p.status === 'in_progress' || p.status === 'in_review'),
-    pct: applicable.length ? Math.round((done / applicable.length) * 100) : 0,
+    // Overall project completion = average of the applicable phases' completion (each phase weighs the same).
+    pct: applicable.length ? Math.round(applicable.reduce((sum, p) => sum + p.pct, 0) / applicable.length) : 0,
     tasksTotal: taskStats.total || 0, tasksDone: taskStats.done || 0,
     allComplete: applicable.length > 0 && done === applicable.length,
   };

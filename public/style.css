@@ -1,5 +1,5 @@
 :root{--bg:#f3f6fb;--panel:#fff;--ink:#13233a;--muted:#5b6b82;--line:#dfe6f0;--navy:#0b1a33;--navy2:#13284d;--blue:#1d6fd8;--blue-soft:#e6f0fd;
---green:#13804b;--green-soft:#e3f5ea;--amber:#a86200;--amber-soft:#fff3dc;--red:#c0362c;--red-soft:#fde8e6;--grey-soft:#eef1f5;--radius:10px}
+--green:#13804b;--green-soft:#e3f5ea;--amber:#a86200;--amber-soft:#fff3dc;--red:#c0362c;--red-soft:#fde8e6;--grey-soft:#eef1f5;--track:#e3e9f2;--radius:10px}
 *{box-sizing:border-box}html,body{margin:0}body{font:14px/1.5 "Segoe UI",system-ui,-apple-system,Helvetica,Arial,sans-serif;color:var(--ink);background:var(--bg)}
 a{color:var(--blue);text-decoration:none}a:hover{text-decoration:underline}
 h1{font-size:22px;margin:0 0 4px}h2{font-size:17px;margin:0 0 12px}h3{font-size:15px;margin:16px 0 8px}
@@ -65,3 +65,7 @@ details>summary{cursor:pointer;font-weight:600;color:var(--blue)}
 .stack>*+*{margin-top:8px}
 .report table{margin-bottom:8px}
 @media print{.side,.top,.banner,.noprint{display:none!important}.content{padding:0}.card{border:none}}
+.progress-summary{display:flex;gap:24px;align-items:center;flex-wrap:wrap}.progress-facts{flex:1;min-width:240px}
+.donut{flex-shrink:0}.donut-num{font-size:24px;font-weight:700;fill:var(--ink)}.donut-label{font-size:10px;fill:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.phase-top{display:flex;justify-content:space-between;align-items:baseline}.phase-pct{font-size:18px;font-weight:700;color:var(--ink)}
+.phase.na .phase-pct{display:none}

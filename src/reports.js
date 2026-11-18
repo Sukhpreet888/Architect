@@ -17,11 +17,11 @@ async function projectReport(org, project) {
   const sections = [
     { heading: 'Summary', kpis: [
       ['Code', project.code], ['Client', project.client_name || '—'], ['Type', `${PROJECT_TYPES[project.type]?.name || project.type} — ${project.subtype || ''}`],
-      ['Scope', SCOPES[project.scope]], ['Status', project.status], ['Progress', `${prog.pct}% (${prog.done}/${prog.applicable} phases)`],
+      ['Scope', SCOPES[project.scope]], ['Status', project.status], ['Progress', `${prog.pct}% complete (${prog.done}/${prog.applicable} phases completed)`],
       ['Tasks done', `${prog.tasksDone}/${prog.tasksTotal}`], ['Start', fmtDate(project.start_date)], ['Target end', fmtDate(project.end_date)],
     ] },
-    { heading: 'Phases', table: { columns: ['#', 'Phase', 'Status', 'Planned start', 'Planned end', 'Completed'],
-      rows: prog.phases.map((p) => [p.seq, p.name, p.status.replace('_', ' '), fmtDate(p.planned_start), fmtDate(p.planned_end), fmtDate(p.completed_at)]) } },
+    { heading: 'Phases', table: { columns: ['#', 'Phase', 'Status', '% complete', 'Tasks done', 'Planned start', 'Planned end', 'Completed'],
+      rows: prog.phases.map((p) => [p.seq, p.name, p.status.replace('_', ' '), p.pct === null ? 'N/A' : `${p.pct}%`, `${p.tasks_done}/${p.tasks_total}`, fmtDate(p.planned_start), fmtDate(p.planned_end), fmtDate(p.completed_at)]) } },
     { heading: 'Tasks', table: { columns: ['Task', 'Phase', 'Assignee', 'Priority', 'Due', 'Status', 'Progress'],
       rows: tasks.map((t) => [t.title, t.phase || '—', t.assignee || '—', t.priority, fmtDate(t.due_date), TASK_STATUSES[t.status], `${t.progress}%`]) } },
     { heading: 'Approvals', table: { columns: ['Request', 'Type', 'Round', 'Requested by', 'Status'],

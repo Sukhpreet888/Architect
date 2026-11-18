@@ -1,15 +1,29 @@
 <%- include('../partials/head') %>
 <%- include('../partials/project-nav') %>
-<p class="muted">Phase tracker — <%= prog.done %> of <%= prog.applicable %> applicable phases complete (<%= prog.pct %>%).</p>
-<div class="bar" style="margin-bottom:16px"><i style="width:<%= prog.pct %>%"></i></div>
+<% const completedPhases = prog.phases.filter(p => p.status === 'completed').length; %>
+<div class="card progress-summary">
+  <%- include('../partials/donut', { pct: prog.pct, size: 150, label: 'complete' }) %>
+  <div class="progress-facts">
+    <h2 style="margin:0 0 4px">Project completion: <%= prog.pct %>%</h2>
+    <p class="muted small" style="margin:0 0 12px">Average completion of the <%= prog.applicable %> applicable phases. Each phase's % comes from its tasks' progress.</p>
+    <div class="grid g3">
+      <div><div class="muted small">Phases completed</div><b><%= completedPhases %> of <%= prog.applicable %></b></div>
+      <div><div class="muted small">Tasks done</div><b><%= prog.tasksDone %> of <%= prog.tasksTotal %></b></div>
+      <div><div class="muted small">Current phase</div><b><%= prog.active ? prog.active.name : (prog.allComplete ? 'All complete' : '—') %></b></div>
+    </div>
+  </div>
+</div>
 <div class="phases">
-<% prog.phases.forEach(ph => { const s = byPhase[ph.id] || { total: 0, done: 0 }; %>
-  <a class="phase <%= ph.status %>" href="/projects/<%= project.id %>/phases/<%= ph.id %>" style="color:inherit;text-decoration:none">
-    <div class="n">PHASE <%= ph.seq %></div><b><%= ph.name %></b>
+<% prog.phases.forEach(ph => { %>
+  <a class="phase <%= ph.status %>" href="/projects/<%= project.id %>/phases/<%= ph.id %>" style="color:inherit;text-decoration:none" title="<%= ph.name %>: <%= ph.status === 'na' ? 'not applicable' : ph.pct + '% complete' %>">
+    <div class="phase-top"><div class="n">PHASE <%= ph.seq %></div><% if (ph.status !== 'na') { %><div class="phase-pct"><%= ph.pct %>%</div><% } %></div>
+    <b><%= ph.name %></b>
     <div style="margin:6px 0"><%- badge(ph.status === 'na' ? 'cancelled' : ph.status, ph.status === 'na' ? 'Not applicable' : null) %></div>
     <% if (ph.status !== 'na') { %><div class="small muted"><%= fmtDate(ph.planned_start) %> → <%= fmtDate(ph.planned_end) %></div>
-    <div class="small"><%= s.done || 0 %>/<%= s.total %> tasks</div><div class="bar"><i style="width:<%= s.total ? Math.round((s.done||0)/s.total*100) : 0 %>%"></i></div><% } %>
+    <div class="small"><%= ph.tasks_done %>/<%= ph.tasks_total %> tasks done</div>
+    <div class="bar" role="progressbar" aria-valuenow="<%= ph.pct %>" aria-valuemin="0" aria-valuemax="100" aria-label="<%= ph.name %> completion"><i style="width:<%= ph.pct %>%"></i></div><% } %>
   </a>
 <% }) %>
 </div>
+<p class="muted small">Phase % = average progress of the phase's tasks (a task marked done counts as 100%). A phase approved/marked complete is 100%.</p>
 <%- include('../partials/foot') %>

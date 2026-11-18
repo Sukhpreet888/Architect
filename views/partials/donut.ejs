@@ -1,0 +1,11 @@
+<%# Single-value progress donut. Params: pct (0-100), size (px, default 140), label (text under the number) %>
+<% const _pct = Math.max(0, Math.min(100, Number(pct) || 0)); const _size = locals.size || 140; const _r = 50; const _c = 2 * Math.PI * _r; const _len = _c * _pct / 100; %>
+<svg class="donut" width="<%= _size %>" height="<%= _size %>" viewBox="0 0 120 120" role="img" aria-label="<%= _pct %>% <%= locals.label || 'complete' %>">
+  <title><%= _pct %>% <%= locals.label || 'complete' %></title>
+  <circle cx="60" cy="60" r="<%= _r %>" fill="none" stroke="var(--track)" stroke-width="12"/>
+  <% if (_pct > 0) { %><circle cx="60" cy="60" r="<%= _r %>" fill="none" stroke="var(--blue)" stroke-width="12"
+    stroke-linecap="<%= _pct < 100 ? 'round' : 'butt' %>" stroke-dasharray="<%= _len.toFixed(2) %> <%= _c.toFixed(2) %>" transform="rotate(-90 60 60)"/><% } %>
+  <% const _small = _size < 100; %>
+  <text x="60" y="<%= _small ? 60 : 56 %>" text-anchor="middle" dominant-baseline="central" class="donut-num"<%- _small ? ' style="font-size:28px"' : '' %>><%= _pct %>%</text>
+  <% if (!_small) { %><text x="60" y="80" text-anchor="middle" class="donut-label"><%= locals.label || 'complete' %></text><% } %>
+</svg>

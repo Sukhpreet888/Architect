@@ -124,9 +124,7 @@ router.post('/projects/:pid/members', loadProject, projectOpen, perm('project_ma
 // ---- Phase tracker (10 architectural phases)
 router.get('/projects/:pid/phases', loadProject, async (req, res) => {
   const prog = await S.phaseProgress(req.project.id);
-  const stats = await db.all(`SELECT phase_id, COUNT(*) total, SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) done FROM tasks WHERE project_id = ? GROUP BY phase_id`, req.project.id);
-  const byPhase = Object.fromEntries(stats.map((s) => [s.phase_id, s]));
-  res.render('projects/phases', { title: `${req.project.name} — Phase tracker`, prog, byPhase });
+  res.render('projects/phases', { title: `${req.project.name} — Phase tracker`, prog });
 });
 
 async function loadPhase(req, res, next) {
