@@ -62,13 +62,15 @@ async function send(msg) {
   // SMTP delivery happens in the background so requests never wait on the mail server.
   if (t) {
     for (const { to, id } of ids) {
-      db.outsideTx(() => t.sendMail({ from: config.mail.from, to, subject: msg.subject, html, text })
+      const delivery = db.outsideTx(() => t.sendMail({ from: config.mail.from, to, subject: msg.subject, html, text })
         .then(() => db.run("UPDATE email_log SET status = 'sent' WHERE id = ?", id))
         .catch((err) => {
           console.error(`[email:failed] to=${to}: ${err.message}`);
           return db.run("UPDATE email_log SET status = 'failed', error = ? WHERE id = ?", String(err.message || err), id);
         })
         .catch((e) => console.error('[email] log update failed', e.message)));
+      // On Vercel, keep the function alive until the email is handed to the SMTP server.
+      if (config.onVercel) require('@vercel/functions').waitUntil(delivery);
     }
   }
   return ids;

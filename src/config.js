@@ -5,12 +5,28 @@ const fs = require('fs');
 const envFile = path.join(__dirname, '..', '.env');
 if (fs.existsSync(envFile) && typeof process.loadEnvFile === 'function') process.loadEnvFile(envFile);
 
-const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, '..', 'data'));
+const onVercel = !!process.env.VERCEL;
+// Vercel functions can only write to /tmp
+const DATA_DIR = path.resolve(process.env.DATA_DIR || (onVercel ? '/tmp/archflow' : path.join(__dirname, '..', 'data')));
+
+function defaultAppUrl() {
+  if (onVercel && process.env.VERCEL_PROJECT_PRODUCTION_URL) return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+  return `http://localhost:${process.env.PORT || 3000}`;
+}
+function sessionSecret() {
+  if (process.env.SESSION_SECRET) return process.env.SESSION_SECRET;
+  // Without an explicit secret, derive a stable one from the (secret) database URL so production cookies are not
+  // signed with a public default.
+  if (process.env.DATABASE_URL) return require('crypto').createHash('sha256').update(`archflow-session:${process.env.DATABASE_URL}`).digest('hex');
+  return 'archflow-dev-secret-change-me';
+}
 
 const config = {
+  onVercel,
   port: Number(process.env.PORT || 3000),
-  appUrl: (process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`).replace(/\/$/, ''),
-  sessionSecret: process.env.SESSION_SECRET || 'archflow-dev-secret-change-me',
+  appUrl: (process.env.APP_URL || defaultAppUrl()).replace(/\/$/, ''),
+  sessionSecret: sessionSecret(),
+  cronSecret: process.env.CRON_SECRET || '',
   dataDir: DATA_DIR,
   // Supabase Postgres connection string (Dashboard → Connect → Session pooler). Empty = embedded local Postgres.
   databaseUrl: process.env.DATABASE_URL || '',

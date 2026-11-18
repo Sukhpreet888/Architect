@@ -40,6 +40,10 @@ async function afterUpload(req, err) {
         await require('./notify').usageLimitReached(req.org, 'storage');
       }
     }
+    if (req.file && config.onVercel && !storage.useSupabase) {
+      storage.discardTemp(req.file); req.file = undefined;
+      req.uploadError = 'File storage is not configured yet — add SUPABASE_SERVICE_ROLE_KEY in the Vercel project settings.';
+    }
     if (req.file) req.file.filename = await storage.save(req.file);
   }
 }

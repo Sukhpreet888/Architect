@@ -11,6 +11,7 @@ process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'archflow-test-'));
 process.env.SMTP_HOST = '';
 process.env.DATABASE_URL = ''; // embedded Postgres for tests
 process.env.SUPABASE_URL = '';
+process.env.BOOTSTRAP_FIRST_USER = '0';
 
 const app = require('../src/app');
 const db = require('../src/db');

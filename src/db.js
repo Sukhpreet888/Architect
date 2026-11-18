@@ -16,9 +16,19 @@ const { config } = require('./config');
 const SCHEMA = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
 const txStore = new AsyncLocalStorage();
 
+// Every ARCHFLOW table lives in the "archflow" schema. Table names are qualified in each query, so the app
+// does not depend on search_path — it works through any Supabase pooler (session or transaction mode).
+const TABLES = [...SCHEMA.matchAll(/CREATE TABLE IF NOT EXISTS archflow\.(\w+)/g)].map((m) => m[1]);
+const TABLE_RE = new RegExp(`\\b(FROM|JOIN|INTO|UPDATE)\\s+(${TABLES.join('|')})\\b`, 'gi');
+const sqlCache = new Map();
 function toPg(sql) {
-  let i = 0;
-  return sql.replace(/\?/g, () => `$${++i}`);
+  let out = sqlCache.get(sql);
+  if (out === undefined) {
+    let i = 0;
+    out = sql.replace(TABLE_RE, '$1 archflow.$2').replace(/\?/g, () => `$${++i}`);
+    if (sqlCache.size < 5000) sqlCache.set(sql, out);
+  }
+  return out;
 }
 function norm(params) {
   return params.map((v) => (v === undefined || v === '' ? null : typeof v === 'boolean' ? (v ? 1 : 0) : v));
@@ -31,8 +41,15 @@ if (config.databaseUrl) {
   pg.types.setTypeParser(20, (v) => Number(v)); // bigint (COUNT/SUM) -> number
   pg.types.setTypeParser(1700, (v) => Number(v)); // numeric -> number
   const ssl = /localhost|127\.0\.0\.1/.test(config.databaseUrl) || /sslmode=disable/.test(config.databaseUrl) ? false : { rejectUnauthorized: false };
-  const pool = new pg.Pool({ connectionString: config.databaseUrl, ssl, max: Number(process.env.DB_POOL_SIZE || 10) });
-  pool.on('connect', (c) => c.query('SET search_path TO archflow, public'));
+  const pool = new pg.Pool({
+    connectionString: config.databaseUrl, ssl,
+    max: Number(process.env.DB_POOL_SIZE || (process.env.VERCEL ? 3 : 10)),
+    idleTimeoutMillis: process.env.VERCEL ? 5000 : 30000,
+  });
+  if (process.env.VERCEL) {
+    // let Vercel close idle connections before a function instance is suspended
+    try { require('@vercel/functions').attachDatabasePool(pool); } catch { /* older runtime */ }
+  }
   pool.on('error', (e) => console.error('[db] idle client error', e.message));
   driver = {
     name: 'postgres',
@@ -65,13 +82,13 @@ if (config.databaseUrl) {
 }
 
 let readyPromise = null;
-/** Create the schema if needed (idempotent). Called once at startup. */
+/** Create the schema if it does not exist yet (idempotent; a single quick check when already present). */
 function ready() {
   if (!readyPromise) {
     readyPromise = (async () => {
-      await driver.exec(SCHEMA);
-      if (driver.name === 'pglite') await driver.exec('SET search_path TO archflow, public');
-    })();
+      const r = await driver.query(`SELECT to_regclass('archflow.${TABLES[TABLES.length - 1]}') AS t`, []);
+      if (!r.rows[0] || !r.rows[0].t) await driver.exec(SCHEMA);
+    })().catch((e) => { readyPromise = null; throw e; });
   }
   return readyPromise;
 }

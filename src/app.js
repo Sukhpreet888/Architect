@@ -14,6 +14,31 @@ app.set('trust proxy', 1);
 app.disable('x-powered-by');
 
 app.use('/static', express.static(path.join(__dirname, '..', 'public'), { maxAge: '1h' }));
+
+// ---- health check (add ?db=1 to also check the database connection)
+app.get('/health', async (req, res) => {
+  const out = { ok: true, database: db.driver(), storage: require('./storage').useSupabase ? 'supabase' : 'local', email: C.config.mail.host ? 'smtp' : 'log-only' };
+  if (req.query.db) {
+    try { await db.get('SELECT 1 AS one'); out.db = 'ok'; } catch (e) { console.error('[health] database error:', e.message); out.ok = false; out.db = 'error — see function logs'; }
+  }
+  res.status(out.ok ? 200 : 503).json(out);
+});
+
+// ---- email reminder job, triggered by Vercel Cron (vercel.json) or any external scheduler
+app.get('/cron/reminders', async (req, res) => {
+  if (C.config.cronSecret && req.get('authorization') !== `Bearer ${C.config.cronSecret}`) return res.status(401).json({ error: 'unauthorized' });
+  const result = await require('./scheduler').runReminders();
+  console.log('[cron] reminder emails:', JSON.stringify(result));
+  res.json(result);
+});
+
+// ---- on Vercel the app needs a real database; the embedded one would be wiped on every cold start
+app.use((req, res, next) => {
+  if (C.config.onVercel && !C.config.databaseUrl) {
+    return res.status(503).type('html').send('<h1>ARCHFLOW setup needed</h1><p>Add the <code>DATABASE_URL</code> environment variable (Supabase connection string) in your Vercel project settings, then redeploy.</p>');
+  }
+  next();
+});
 app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieSession({
