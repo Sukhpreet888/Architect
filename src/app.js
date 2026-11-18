@@ -109,6 +109,7 @@ app.use(require('./routes/documents'));
 app.use(require('./routes/approvals'));
 app.use(require('./routes/payments'));
 app.use(require('./routes/construction'));
+app.use(require('./routes/costs'));
 app.use(require('./routes/reports'));
 app.use(require('./routes/closure'));
 

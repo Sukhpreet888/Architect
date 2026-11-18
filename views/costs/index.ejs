@@ -1,0 +1,161 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const base = `/projects/${project.id}/costs`; const open = project.status === 'active';
+   const qs = (o) => '?' + new URLSearchParams(Object.fromEntries(Object.entries(Object.assign({}, query, o)).filter(([, v]) => v !== '' && v != null))).toString();
+   const budget = project.construction_budget || 0; const used = budget ? Math.round(totals.approved / budget * 100) : 0;
+   const period = rg.all ? 'All time' : `${fmtDate(rg.from)} – ${fmtDate(rg.to)}`;
+   const monthStart = U.today().slice(0, 8) + '01'; %>
+
+<div class="head" style="margin-bottom:12px">
+  <form class="row cost-filter" method="get" style="align-items:flex-end;flex:1">
+    <div style="flex:0 0 auto"><label>Period</label>
+      <div class="seg"><a href="<%= qs({ period: '', from: '', to: '' }) %>" class="<%= !query.period && !query.from ? 'on' : '' %>">Last 30 days</a><a href="<%= qs({ period: 'custom', from: monthStart, to: U.today() }) %>" class="<%= query.from === monthStart && query.to === U.today() ? 'on' : '' %>">This month</a><a href="<%= qs({ period: 'all', from: '', to: '' }) %>" class="<%= query.period === 'all' ? 'on' : '' %>">All time</a></div></div>
+    <div style="max-width:170px"><label>From</label><input type="date" name="from" value="<%= rg.from || '' %>"></div>
+    <div style="max-width:170px"><label>To</label><input type="date" name="to" value="<%= rg.to || '' %>"></div>
+    <input type="hidden" name="period" value="custom"><% if (f.category) { %><input type="hidden" name="category" value="<%= f.category %>"><% } %>
+    <div style="flex:0"><button class="btn grey">Apply</button></div>
+  </form>
+  <div class="nowrap" style="align-self:flex-end"><a class="btn ghost" href="<%= base %>/export<%= qs({ format: 'xlsx' }) %>">Export Excel</a> <a class="btn ghost" href="<%= base %>/export<%= qs({ format: 'pdf' }) %>">Export PDF</a></div>
+</div>
+
+<div class="grid g4">
+  <div class="kpi"><div class="l">Total budget</div><div class="v"><%= money(budget) %></div><div class="muted small"><%= budget ? used + '% used' : 'Not set' %></div><% if (budget) { %><div class="bar"><i style="width:<%= Math.min(used, 100) %>%;<%= used >= 100 ? 'background:var(--red)' : '' %>"></i></div><% } %></div>
+  <div class="kpi"><div class="l">Approved cost (to date)</div><div class="v"><%= money(totals.approved) %></div><div class="muted small">Remaining <%= budget ? money(budget - totals.approved) : '—' %></div></div>
+  <div class="kpi <%= totals.pending ? 'amber' : '' %>"><div class="l">Pending approval</div><div class="v"><%= money(totals.pending) %></div></div>
+  <div class="kpi"><div class="l">Cost in period</div><div class="v"><%= money(rangeTotal) %></div><div class="muted small"><%= period %><%= span ? ` · avg ${money(rangeTotal / span)}/day` : '' %></div></div>
+</div>
+
+<h2 style="margin-top:20px">Cost by category <span class="muted small" style="font-weight:400">— approved to date vs budget</span></h2>
+<div class="cost-cats">
+<% categories.forEach(c => { const pct = c.budget ? Math.round(c.approved / c.budget * 100) : null; %>
+  <a class="cost-cat <%= f.category === c.key ? 'on' : '' %>" href="<%= qs({ category: f.category === c.key ? '' : c.key }) %>#register" title="<%= f.category === c.key ? 'Show all categories' : 'Show only ' + c.label + ' in the register' %>">
+    <div class="muted small"><%= c.label %></div>
+    <div class="cost-amt"><%= money(c.approved) %></div>
+    <div class="small muted"><%= c.budget ? `of ${money(c.budget)} · ${pct}%` : 'No budget set' %><%= c.pending ? ` · ${money(c.pending)} pending` : '' %></div>
+    <div class="bar"><i style="width:<%= pct === null ? 0 : Math.min(pct, 100) %>%;<%= pct !== null && pct >= 100 ? 'background:var(--red)' : '' %>"></i></div>
+  </a>
+<% }) %>
+</div>
+
+<div class="grid g2" style="margin-top:16px;align-items:start">
+<% if (open && can('cost_record')) { %>
+<div class="card">
+  <h2>Record a cost</h2>
+  <form method="post" action="<%= base %>" id="cost-form">
+    <div class="row">
+      <div><label>Category</label><select name="category" id="cost-cat" required><% Object.entries(cats).forEach(([k, v]) => { %><option value="<%= k %>" <%= (f.category || 'labour') === k ? 'selected' : '' %>><%= v %></option><% }) %></select></div>
+      <div><label>Date</label><input type="date" name="spent_on" value="<%= U.today() %>" max="<%= U.today() %>" required></div>
+    </div>
+    <label>Description</label><input name="description" id="cost-desc" required placeholder="e.g. Masons and helpers — slab shuttering">
+    <div class="row">
+      <div><label>Quantity <span class="muted">(optional)</span></label><input type="number" step="any" min="0" name="qty" id="cost-qty" placeholder="6"></div>
+      <div><label>Unit</label><input name="unit" id="cost-unit" placeholder="workers"></div>
+      <div><label>Rate <span class="muted">(<%= org.currency %>)</span></label><input type="number" step="any" min="0" name="rate" id="cost-rate" placeholder="800"></div>
+    </div>
+    <div class="row">
+      <div><label>Amount <span class="muted">(<%= org.currency %>)</span></label><input type="number" step="0.01" min="0" name="amount" id="cost-amount" placeholder="auto = quantity × rate"></div>
+      <div><label>Vendor / payee</label><input name="vendor" placeholder="Contractor, supplier or crew"></div>
+    </div>
+    <div class="row">
+      <div><label>Bill / invoice ref.</label><input name="invoice_ref"></div>
+      <div id="visit-field" hidden><label>Site visit</label><select name="visit_id"><option value="">—</option><% visits.forEach(v => { %><option value="<%= v.id %>"><%= fmtDate(v.visit_date) %> — <%= v.purpose %></option><% }) %></select></div>
+    </div>
+    <p class="muted small" id="cost-hint"></p>
+    <p><button class="btn">Record cost</button> <span class="muted small">Sent to Admin / PM / Accountant for approval by email.</span></p>
+  </form>
+</div>
+<% } %>
+<div class="card">
+  <h2>Budget vs actual</h2>
+  <table class="small">
+    <tr><th>Category</th><th class="right">Budget</th><th class="right">Approved</th><th class="right">Pending</th><th class="right">Remaining</th></tr>
+    <% categories.forEach(c => { %><tr><td><%= c.label %></td><td class="right"><%= c.budget ? money(c.budget) : '—' %></td><td class="right"><%= money(c.approved) %></td><td class="right"><%= c.pending ? money(c.pending) : '—' %></td>
+      <td class="right" style="<%= c.budget && c.approved > c.budget ? 'color:var(--red);font-weight:600' : '' %>"><%= c.budget ? money(c.budget - c.approved) : '—' %></td></tr><% }) %>
+    <tr><td><b>Total</b></td><td class="right"><b><%= budget ? money(budget) : '—' %></b></td><td class="right"><b><%= money(totals.approved) %></b></td><td class="right"><b><%= money(totals.pending) %></b></td><td class="right"><b><%= budget ? money(budget - totals.approved) : '—' %></b></td></tr>
+  </table>
+  <% if (open && can('project_manage')) { %>
+  <details style="margin-top:12px"><summary>Set budgets</summary>
+    <form method="post" action="<%= base %>-budget" id="budget-form">
+      <label>Total project cost budget</label><input type="number" step="any" min="0" name="total" value="<%= budget %>">
+      <div class="grid g2" style="gap:0 12px"><% categories.forEach(c => { %><div><label><%= c.label %></label><input type="number" step="any" min="0" name="budget_<%= c.key %>" value="<%= c.budget || '' %>" placeholder="optional"></div><% }) %></div>
+      <p><button class="btn sm">Save budgets</button></p>
+    </form>
+  </details><% } %>
+</div>
+</div>
+
+<div class="card" id="daily">
+  <div class="head" style="margin-bottom:6px"><h2 style="margin:0">Daily cost <span class="muted small" style="font-weight:400">— approved, <%= period %></span></h2>
+    <span class="muted small"><%= days.length %> day<%= days.length === 1 ? '' : 's' %> with costs · total <b><%= money(rangeTotal) %></b></span></div>
+  <% // chronological series for the chart: every day for ranges up to 62 days, otherwise days with costs
+     const byDate = Object.fromEntries(days.map(d => [d.date, d]));
+     let series = [];
+     if (!rg.all && span <= 62) { for (let i = 0; i < span; i++) { const d = U.addDays(rg.from, i); series.push({ date: d, total: byDate[d] ? byDate[d].total : 0 }); } }
+     else series = days.slice().reverse().map(d => ({ date: d.date, total: d.total }));
+     const maxV = Math.max(0, ...series.map(s => s.total));
+     const W = Math.max(series.length * 18, 300), H = 160, pad = 4; const bw = Math.max(4, Math.min(14, (W / Math.max(series.length, 1)) - 4)); %>
+  <% if (maxV > 0) { %>
+  <div class="daily-chart" role="img" aria-label="Daily approved cost, <%= period %>. Highest day <%= money(maxV) %>.">
+    <div class="daily-axis small muted"><span><%= money(maxV) %></span><span><%= money(maxV / 2) %></span><span>0</span></div>
+    <svg viewBox="0 0 <%= W %> <%= H %>" preserveAspectRatio="none" class="daily-svg">
+      <line x1="0" x2="<%= W %>" y1="<%= pad %>" y2="<%= pad %>" class="grid-line"/><line x1="0" x2="<%= W %>" y1="<%= (H + pad) / 2 %>" y2="<%= (H + pad) / 2 %>" class="grid-line"/><line x1="0" x2="<%= W %>" y1="<%= H - 0.5 %>" y2="<%= H - 0.5 %>" class="base-line"/>
+      <% series.forEach((s, i) => { const slot = W / series.length; const h = maxV ? (s.total / maxV) * (H - pad) : 0; const x = i * slot + (slot - bw) / 2; %>
+        <g class="dbar"><rect x="<%= i * slot %>" y="0" width="<%= slot %>" height="<%= H %>" fill="transparent"/>
+          <% if (h > 0) { %><path d="M<%= x %>,<%= H %> V<%= H - h + Math.min(3, h) %> q0,-<%= Math.min(3, h) %> <%= Math.min(3, bw / 2) %>,-<%= Math.min(3, h) %> H<%= x + bw - Math.min(3, bw / 2) %> q<%= Math.min(3, bw / 2) %>,0 <%= Math.min(3, bw / 2) %>,<%= Math.min(3, h) %> V<%= H %> Z" class="dbar-fill"/><% } %>
+          <title><%= fmtDate(s.date) %>: <%= money(s.total) %></title></g>
+      <% }) %>
+    </svg>
+    <div class="daily-x small muted"><span><%= fmtDate(series[0].date) %></span><span><%= fmtDate(series[series.length - 1].date) %></span></div>
+  </div>
+  <% } %>
+  <div class="tablewrap" style="margin-top:10px"><table class="small">
+    <tr><th>Date</th><% categories.forEach(c => { %><th class="right"><%= c.label %></th><% }) %><th class="right">Total</th><th class="right">Pending</th></tr>
+    <% days.forEach(d => { %><tr><td class="nowrap"><a href="<%= qs({ period: 'custom', from: d.date, to: d.date }) %>#register"><%= fmtDate(d.date) %></a></td>
+      <% categories.forEach(c => { %><td class="right"><%= d.cats[c.key] ? money(d.cats[c.key]) : '—' %></td><% }) %>
+      <td class="right"><b><%= money(d.total) %></b></td><td class="right muted"><%= d.pending ? money(d.pending) : '—' %></td></tr><% }) %>
+    <% if (!days.length) { %><tr><td colspan="<%= categories.length + 3 %>" class="empty">No costs recorded in this period.</td></tr><% } %>
+  </table></div>
+</div>
+
+<div class="card" id="register">
+  <div class="head" style="margin-bottom:6px"><h2 style="margin:0">Cost register <span class="muted small" style="font-weight:400">— <%= period %><%= f.category ? ' · ' + cats[f.category] : '' %></span></h2>
+    <div class="seg"><a href="<%= qs({ status: '' }) %>#register" class="<%= !f.status ? 'on' : '' %>">All</a><a href="<%= qs({ status: 'pending' }) %>#register" class="<%= f.status === 'pending' ? 'on' : '' %>">Pending</a><a href="<%= qs({ status: 'approved' }) %>#register" class="<%= f.status === 'approved' ? 'on' : '' %>">Approved</a><a href="<%= qs({ status: 'rejected' }) %>#register" class="<%= f.status === 'rejected' ? 'on' : '' %>">Rejected</a></div></div>
+  <div class="tablewrap"><table class="small">
+    <tr><th>Date</th><th>Category</th><th>Description</th><th>Qty × rate</th><th>Vendor / payee</th><th class="right">Amount</th><th>Status</th><th></th></tr>
+    <% register.forEach(e => { %><tr>
+      <td class="nowrap"><%= fmtDate(e.spent_on) %></td><td><%= cats[e.category] || e.category %></td>
+      <td><%= e.description %><div class="muted"><%= e.invoice_ref ? 'Ref ' + e.invoice_ref + ' · ' : '' %>by <%= e.creator || '—' %><%= e.visit_date ? ' · visit ' + fmtDate(e.visit_date) : '' %></div></td>
+      <td class="nowrap"><%= e.qty ? `${e.qty} ${e.unit || ''} × ${money(e.rate)}` : '—' %></td><td><%= e.vendor || '—' %></td>
+      <td class="right nowrap"><b><%= money(e.amount) %></b></td>
+      <td><%- badge(e.status) %><% if (e.decider) { %><div class="muted"><%= e.decider %></div><% } %></td>
+      <td class="nowrap"><% if (open && e.status === 'pending') { %>
+        <% if (can('expenditure_approve')) { %><form class="inline" method="post" action="<%= base %>/<%= e.id %>"><button class="btn sm green" name="decision" value="approve">Approve</button> <button class="btn sm red" name="decision" value="reject">Reject</button></form><% } %>
+        <% if (can('expenditure_approve') || e.created_by === user.id) { %><form class="inline" method="post" action="<%= base %>/<%= e.id %>" data-confirm="Delete this pending cost entry?"><input type="hidden" name="action" value="delete"><button class="btn sm grey">Delete</button></form><% } %>
+      <% } %></td></tr><% }) %>
+    <% if (!register.length) { %><tr><td colspan="8" class="empty">No cost entries match.</td></tr><% } %>
+  </table></div>
+</div>
+
+<script>
+(function () {
+  const cat = document.getElementById('cost-cat'); if (!cat) return;
+  const q = document.getElementById('cost-qty'), r = document.getElementById('cost-rate'), a = document.getElementById('cost-amount'), unit = document.getElementById('cost-unit');
+  const hints = {
+    contractor: ['Contractor bill — e.g. RCC work, brickwork, plastering', 'sq ft', ''],
+    labour: ['Daily labour: number of workers × daily wage', 'workers', 'e.g. 6 masons × 900/day'],
+    material: ['Material bought for site (purchases on the Construction tab are added automatically)', 'bags', 'e.g. 50 bags cement × 410'],
+    site_supervision: ['Site supervision: engineer / architect visits, travel, testing', 'visits', 'Optionally link the site visit'],
+    equipment: ['Equipment / machinery hire', 'days', 'e.g. 2 days JCB × 9,000'],
+    other: ['Any other site cost', '', ''],
+  };
+  function apply() {
+    const h = hints[cat.value] || ['', '', ''];
+    document.getElementById('cost-hint').textContent = h[0] + (h[2] ? ' — ' + h[2] : '');
+    if (!unit.value || Object.values(hints).some((x) => x[1] === unit.value)) unit.value = h[1];
+    document.getElementById('visit-field').hidden = cat.value !== 'site_supervision';
+  }
+  function calc() { if (q.value && r.value) a.value = (Math.round(parseFloat(q.value) * parseFloat(r.value) * 100) / 100).toFixed(2); }
+  cat.addEventListener('change', apply); q.addEventListener('input', calc); r.addEventListener('input', calc); apply();
+})();
+</script>
+<%- include('../partials/foot') %>

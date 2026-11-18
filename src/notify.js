@@ -238,13 +238,14 @@ const expenditureDecided = async (exp, project, by) => {
     rows: [['Amount', fmtMoney(exp.amount, org.currency)], ['Decided by', by.name]],
   });
 };
-const budgetAlert = async (project, spent, budget) => {
-  const org = await orgOf(project.org_id);
+const budgetAlert = async (project, spent, budget, categoryLabel) => {
+  const org = orgOf(project.org_id);
+  const what = categoryLabel ? `${categoryLabel} cost` : 'Project cost';
   return await send({
     to: [...await S.projectManagerEmails(project), ...await S.emailsForRoles(project.org_id, ['admin', 'accountant'])], orgId: project.org_id, category: 'construction',
-    subject: `[${project.code}] Construction spend at ${Math.round((spent / budget) * 100)}% of budget`, title: 'Budget alert',
-    rows: [['Budget', fmtMoney(budget, org.currency)], ['Approved spend', fmtMoney(spent, org.currency)]],
-    cta: { label: 'Budget vs actual', url: url(`/projects/${project.id}/construction`) },
+    subject: `[${project.code}] ${what} at ${Math.round((spent / budget) * 100)}% of budget`, title: 'Budget alert',
+    rows: [['Budget', fmtMoney(budget, (await org).currency)], ['Approved spend', fmtMoney(spent, (await org).currency)]],
+    cta: { label: 'Open cost management', url: url(`/projects/${project.id}/costs`) },
   });
 };
 const reorderAlert = async (material, project, supplier) => await send({

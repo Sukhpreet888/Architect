@@ -14,6 +14,7 @@ const { AsyncLocalStorage } = require('async_hooks');
 const { config } = require('./config');
 
 const SCHEMA = fs.readFileSync(path.join(__dirname, '..', 'db', 'schema.sql'), 'utf8');
+const MIGRATIONS = fs.readFileSync(path.join(__dirname, '..', 'db', 'migrations.sql'), 'utf8');
 const txStore = new AsyncLocalStorage();
 
 // Every ARCHFLOW table lives in the "archflow" schema. Table names are qualified in each query, so the app
@@ -88,6 +89,10 @@ function ready() {
     readyPromise = (async () => {
       const r = await driver.query(`SELECT to_regclass('archflow.${TABLES[TABLES.length - 1]}') AS t`, []);
       if (!r.rows[0] || !r.rows[0].t) await driver.exec(SCHEMA);
+      // upgrades for databases created by older versions (only run when the newest change is missing)
+      const m = await driver.query(`SELECT 1 FROM information_schema.columns
+        WHERE table_schema = 'archflow' AND table_name = 'expenditures' AND column_name = 'visit_id'`, []);
+      if (!m.rows.length) await driver.exec(MIGRATIONS);
     })().catch((e) => { readyPromise = null; throw e; });
   }
   return readyPromise;

@@ -9,7 +9,7 @@
 <div class="tabs">
   <%- pt('', 'Overview') %><%- pt('/phases', 'Phase tracker') %><%- pt('/tasks', 'Tasks') %><%- pt('/documents', 'Documents & drawings') %><%- pt('/approvals', 'Approvals') %>
   <% if (can('payments_view')) { %><a href="/payments/invoices?project=<%= project.id %>">Invoices</a><% } %>
-  <%- pt('/construction', 'Construction', project.scope === 'design_construction') %>
+  <%- pt('/construction', 'Construction', project.scope === 'design_construction') %><%- pt('/costs', 'Cost management', can('cost_view')) %>
   <a href="/reports/projects/<%= project.id %>" class="<%= path.startsWith('/reports/projects') ? 'on' : '' %>">Report</a>
   <%- pt('/closure', 'Closure') %>
 </div>

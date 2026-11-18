@@ -92,6 +92,8 @@ const PERMS = {
   payments_view: ['admin', 'pm', 'accountant'],
   construction_manage: ['admin', 'pm', 'site_engineer', 'lead_architect'],
   expenditure_approve: ['admin', 'pm', 'accountant'],
+  cost_view: ['admin', 'pm', 'lead_architect', 'site_engineer', 'accountant'],
+  cost_record: ['admin', 'pm', 'lead_architect', 'site_engineer', 'accountant'],
   reports_view: ['admin', 'pm', 'lead_architect', 'accountant'],
   financial_reports: ['admin', 'pm', 'accountant'],
 };
@@ -110,7 +112,8 @@ const PRIORITIES = { low: 'Low', medium: 'Medium', high: 'High', urgent: 'Urgent
 const TASK_STATUSES = { todo: 'To do', in_progress: 'In progress', review: 'In review', done: 'Done' };
 const INVOICE_STATUSES = { draft: 'Draft', issued: 'Issued', partial: 'Partial', paid: 'Paid', overdue: 'Overdue', disputed: 'Disputed' };
 const PAYMENT_METHODS = { bank_transfer: 'Bank transfer', upi: 'UPI', cheque: 'Cheque', cash: 'Cash', card: 'Card', other: 'Other' };
-const EXPENSE_CATEGORIES = { labour: 'Labour', contractor: 'Contractor', material: 'Material', equipment: 'Equipment', other: 'Other' };
+// Cost categories used by each project's Cost management tab ('contractor' = construction work by contractors)
+const EXPENSE_CATEGORIES = { contractor: 'Construction work', labour: 'Labour', material: 'Material', site_supervision: 'Site supervision', equipment: 'Equipment', other: 'Other' };
 const APPROVAL_TYPES = { design: 'Design', drawing: 'Drawings', material: 'Material', phase: 'Phase review', other: 'Other' };
 const DECISIONS = { approved: 'Approved', revision_required: 'Revision required', rejected: 'Rejected' };
 

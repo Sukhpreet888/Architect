@@ -355,16 +355,45 @@ test('ARCHFLOW full flow', async (t) => {
   });
 
   await t.test('construction: budget, expenditure approval, materials reorder alert, site supervision', async () => {
+    // ---- Cost management tab
     let before = await lastId();
-    let r = await site.post(`/projects/${S.pid}/construction/expenditures`, { category: 'labour', description: 'Excavation crew', amount: '850000', spent_on: U.today() });
+    let r = await site.post(`/projects/${S.pid}/costs`, { category: 'labour', description: 'Excavation crew', amount: '850000', spent_on: U.today() });
     const exp = await db.get('SELECT * FROM expenditures');
     assert.ok((await emails("id > ? AND subject LIKE '%Expenditure awaiting approval%'", before)).length);
-    r = await site.post(`/projects/${S.pid}/construction/expenditures/${exp.id}`, { decision: 'approve' });
+    r = await site.post(`/projects/${S.pid}/costs/${exp.id}`, { decision: 'approve' });
     assert.equal(r.status, 403, 'site engineer cannot approve');
     before = await lastId();
-    r = await acct.post(`/projects/${S.pid}/construction/expenditures/${exp.id}`, { decision: 'approve' });
+    r = await acct.post(`/projects/${S.pid}/costs/${exp.id}`, { decision: 'approve' });
     assert.equal((await db.get('SELECT status FROM expenditures WHERE id = ?', exp.id)).status, 'approved');
     assert.ok((await emails("id > ? AND subject LIKE '%of budget%'", before)).length, 'budget alert at 80%');
+    // per-category budgets + quantity x rate entries (labour, site supervision) + daily totals
+    r = await pm.post(`/projects/${S.pid}/costs-budget`, { total: '1000000', budget_labour: '900000', budget_site_supervision: '20000' });
+    assert.equal((await db.get("SELECT amount FROM cost_budgets WHERE project_id = ? AND category = 'labour'", S.pid)).amount, 900000);
+    r = await site.post(`/projects/${S.pid}/costs`, { category: 'labour', description: 'Masons', qty: '6', unit: 'workers', rate: '900', spent_on: U.today() });
+    const lab = await db.get("SELECT * FROM expenditures WHERE description = 'Masons'");
+    assert.deepEqual([lab.qty, lab.rate, lab.amount], [6, 900, 5400], 'amount = qty x rate');
+    r = await site.post(`/projects/${S.pid}/costs`, { category: 'site_supervision', description: 'Structural engineer visit', amount: '3500', spent_on: U.addDays(U.today(), -1) });
+    r = await site.post(`/projects/${S.pid}/costs`, { category: 'labour', description: 'future', amount: '10', spent_on: U.addDays(U.today(), 3) });
+    assert.ok(!(await db.get("SELECT 1 FROM expenditures WHERE description = 'future'")), 'no future-dated costs');
+    for (const e of await db.all("SELECT id FROM expenditures WHERE status = 'pending'")) await acct.post(`/projects/${S.pid}/costs/${e.id}`, { decision: 'approve' });
+    before = await lastId();
+    r = await site.post(`/projects/${S.pid}/costs`, { category: 'labour', description: 'Overtime', amount: '50000', spent_on: U.today() });
+    const ot = await db.get("SELECT id FROM expenditures WHERE description = 'Overtime'");
+    await pm.post(`/projects/${S.pid}/costs/${ot.id}`, { decision: 'approve' });
+    assert.ok((await emails("id > ? AND subject LIKE '%Labour cost at 10_\\% of budget%'", before)).length, 'category budget alert');
+    r = await pm.get(`/projects/${S.pid}/costs`);
+    assert.equal(r.status, 200);
+    assert.match(r.text, /Daily cost/);
+    assert.match(r.text, /Site supervision/);
+    assert.match(r.text, /Masons/);
+    r = await pm.get(`/projects/${S.pid}/costs/export?format=xlsx&period=all`);
+    assert.match(r.type, /spreadsheetml/);
+    r = await pm.get(`/projects/${S.pid}/costs/export?format=pdf`);
+    assert.equal(r.type, 'application/pdf');
+    r = await arch.get(`/projects/${S.pid}/costs`);
+    assert.equal(r.status, 403, 'architects do not see costs');
+    r = await pm.get(`/projects/${S.pid2}/costs`);
+    assert.equal(r.status, 200, 'cost management also available on design-only projects');
     await site.post(`/projects/${S.pid}/construction/suppliers`, { name: 'UltraCem', email: 'sales@ultracem.test' });
     const sup = await db.get('SELECT * FROM suppliers');
     await site.post(`/projects/${S.pid}/construction/materials`, { name: 'Cement', unit: 'bags', reorder_level: '20', supplier_id: String(sup.id) });

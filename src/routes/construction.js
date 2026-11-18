@@ -6,6 +6,8 @@ const S = require('../services');
 const { EXPENSE_CATEGORIES } = require('../config');
 const { requireOrg, perm, loadProject, projectOpen, httpError, back } = require('../mw');
 const { num, int, isDate, today } = require('../util');
+const { addCost } = require('./costs');
+const addExpenditure = (req, data) => addCost(req.project, req.user, data);
 
 router.use('/projects', requireOrg);
 
@@ -34,47 +36,6 @@ router.get('/projects/:pid/construction', loadProject, constructionOnly, async (
     issues: await db.all('SELECT i.*, t.status task_status, t.assignee_id, u.name assignee FROM site_issues i LEFT JOIN tasks t ON t.id = i.task_id LEFT JOIN users u ON u.id = t.assignee_id WHERE i.project_id = ? ORDER BY i.status = \'resolved\', i.id DESC', pid),
     team: await S.projectTeam(pid),
   });
-});
-
-// ---- Construction cost management
-router.post('/projects/:pid/construction/budget', loadProject, projectOpen, constructionOnly, perm('project_manage'), async (req, res) => {
-  await db.run('UPDATE projects SET construction_budget = ? WHERE id = ?', Math.max(0, num(req.body.budget)), req.project.id);
-  req.flash('success', 'Construction budget set.');
-  res.redirect(base(req));
-});
-
-async function addExpenditure(req, data) {
-  const id = await db.insert('expenditures', { project_id: req.project.id, status: 'pending', created_by: req.user.id, ...data });
-  const exp = await db.get('SELECT * FROM expenditures WHERE id = ?', id);
-  await N.expenditureSubmitted(exp, req.project);
-  return id;
-}
-
-router.post('/projects/:pid/construction/expenditures', loadProject, projectOpen, constructionOnly, perm('construction_manage'), async (req, res) => {
-  const b = req.body;
-  if (!EXPENSE_CATEGORIES[b.category] || !String(b.description || '').trim() || !(num(b.amount) > 0)) {
-    req.flash('error', 'Category, description and a positive amount are required.'); return res.redirect(base(req));
-  }
-  await addExpenditure(req, { category: b.category, description: b.description.trim(), vendor: b.vendor, amount: num(b.amount), spent_on: isDate(b.spent_on) ? b.spent_on : today(), invoice_ref: b.invoice_ref });
-  req.flash('success', 'Expenditure recorded — sent for approval by email.');
-  res.redirect(`${base(req)}#cost`);
-});
-
-router.post('/projects/:pid/construction/expenditures/:eid', loadProject, projectOpen, constructionOnly, perm('expenditure_approve'), async (req, res, next) => {
-  const exp = await db.get('SELECT * FROM expenditures WHERE id = ? AND project_id = ?', req.params.eid, req.project.id);
-  if (!exp) return next(httpError(404, 'Expenditure not found.'));
-  const status = req.body.decision === 'approve' ? 'approved' : req.body.decision === 'reject' ? 'rejected' : null;
-  if (!status || exp.status !== 'pending') { req.flash('error', 'Nothing to decide.'); return res.redirect(base(req)); }
-  const before = await approvedSpend(req.project.id);
-  await db.run('UPDATE expenditures SET status = ?, decided_by = ? WHERE id = ?', status, req.user.id, exp.id);
-  await N.expenditureDecided({ ...exp, status }, req.project, req.user);
-  const budget = req.project.construction_budget;
-  const after = await approvedSpend(req.project.id);
-  if (budget > 0) {
-    for (const th of [0.8, 1]) if (before < budget * th && after >= budget * th) { await N.budgetAlert(req.project, after, budget); break; }
-  }
-  req.flash('success', `Expenditure ${status}.`);
-  res.redirect(`${base(req)}#cost`);
 });
 
 // ---- Materials & inventory
