@@ -8,6 +8,7 @@ const storage = require('./storage');
 
 const DOC_EXT = ['.pdf', '.dwg', '.dxf', '.jpg', '.jpeg', '.png', '.docx', '.xlsx', '.doc', '.xls', '.pptx', '.skp', '.rvt', '.ifc', '.zip', '.txt', '.csv', '.webp'];
 const PROOF_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.webp'];
+const IMG_EXT = ['.jpg', '.jpeg', '.png', '.webp'];
 
 function make(exts) {
   return multer({
@@ -47,4 +48,4 @@ async function afterUpload(req, err) {
     if (req.file) req.file.filename = await storage.save(req.file);
   }
 }
-module.exports = { single, DOC_EXT, PROOF_EXT };
+module.exports = { single, DOC_EXT, PROOF_EXT, IMG_EXT };

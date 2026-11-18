@@ -62,6 +62,14 @@ app.use((req, res, next) => {
   req.session.flash = undefined;
   Object.assign(res.locals, {
     U, C, icon: require('./icons').icon, logo: require('./icons').logo, fmtDate: U.fmtDate, fmtBytes: U.fmtBytes, esc: U.esc, path: req.path, query: req.query,
+    // site photo for a project, or an illustration matching its type when none has been uploaded yet
+    projectPhoto: (p) => {
+      if (p && p.photo_name) return { url: `/projects/${p.id}/photo?v=${encodeURIComponent(p.photo_name.slice(0, 13))}`, uploaded: true };
+      const sub = String((p && p.subtype) || '').toLowerCase();
+      const img = /villa/.test(sub) ? 'villa' : /bhk|apartment/.test(sub) ? 'apartment'
+        : p && p.type === 'commercial' ? 'commercial' : p && p.type === 'mixed_use' ? 'apartment' : p && p.type === 'exterior' ? 'villa' : 'residential';
+      return { url: `/static/img/${img}.jpg`, uploaded: false };
+    },
     badge: (st, label) => {
       const cls = { completed: 'green', approved: 'green', paid: 'green', done: 'green', active: 'green', resolved: 'green', sent: 'green',
         in_progress: 'blue', issued: 'blue', in_review: 'blue', review: 'blue', pending: 'amber', submitted: 'blue', scheduled: 'blue', trial: 'blue', logged: 'blue',

@@ -69,4 +69,19 @@ async function send(res, name, originalName) {
   return true;
 }
 
-module.exports = { useSupabase, ensureBucket, save, remove, discardTemp, send };
+/** Show an image inline (e.g. <img src>), after the caller's permission check. */
+async function sendInline(res, name) {
+  if (useSupabase) {
+    const { data, error } = await sb().storage.from(config.supabase.bucket).createSignedUrl(path.basename(name), 3600);
+    if (error || !data) return false;
+    res.set('Cache-Control', 'private, max-age=600');
+    res.redirect(data.signedUrl);
+    return true;
+  }
+  if (!fs.existsSync(local(name))) return false;
+  res.set('Cache-Control', 'private, max-age=600');
+  res.sendFile(local(name));
+  return true;
+}
+
+module.exports = { useSupabase, ensureBucket, save, remove, discardTemp, send, sendInline };

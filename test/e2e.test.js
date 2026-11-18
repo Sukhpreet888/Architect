@@ -264,6 +264,23 @@ test('ARCHFLOW full flow', async (t) => {
     r = await arch.get(`/projects/${S.pid}/documents/${fee.id}`);
     assert.equal(r.status, 404);
     S.docId = doc.id;
+    // site photo: upload, shown on dashboard + projects page, served to team members, replaced/removed
+    const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082', 'hex');
+    let fdp = new FormData(); fdp.append('photo', new Blob([png], { type: 'image/png' }), 'site.png');
+    r = await pm.post(`/projects/${S.pid}/photo`, null, { multipart: fdp });
+    const withPhoto = await db.get('SELECT photo_name, photo_size FROM projects WHERE id = ?', S.pid);
+    assert.ok(withPhoto.photo_name && withPhoto.photo_size === png.length, 'photo saved');
+    r = await arch.get(`/projects/${S.pid}/photo`);
+    assert.equal(r.status, 200); assert.match(r.type, /image\/png/);
+    r = await pm.get('/dashboard'); assert.match(r.text, new RegExp(`/projects/${S.pid}/photo\\?v=`));
+    r = await pm.get('/projects'); assert.match(r.text, new RegExp(`/projects/${S.pid}/photo\\?v=`));
+    r = await pm.get('/projects?view=list'); assert.match(r.text, /class="thumb"/);
+    fdp = new FormData(); fdp.append('photo', new Blob(['not an image'], { type: 'text/plain' }), 'x.png');
+    r = await pm.post(`/projects/${S.pid}/photo`, null, { multipart: fdp });
+    assert.equal((await db.get('SELECT photo_name FROM projects WHERE id = ?', S.pid)).photo_name, withPhoto.photo_name, 'non-image rejected');
+    r = await arch.post(`/projects/${S.pid}/photo/remove`, {});
+    assert.equal(r.status, 403, 'only managers change the photo');
+    r = await pm.get(`/projects/${S.pid2}`); assert.match(r.text, /Sample image/, 'projects without a photo show a sample image');
   });
 
   await t.test('phase review: submit, revision required, resubmit, approve -> next phase', async () => {

@@ -1,10 +1,33 @@
 <%- include('../partials/head') %>
-<div class="head"><div><h1>Projects</h1></div><% if (can('project_create')) { %><a class="btn" href="/projects/new">+ New project</a><% } %></div>
-<div class="seg" style="margin-bottom:12px"><a href="/projects" class="<%= status==='active'?'on':'' %>">Active</a><a href="/projects?status=closed" class="<%= status==='closed'?'on':'' %>">Completed / archived</a></div>
+<% const view = query.view === 'list' ? 'list' : 'grid'; const vq = (v) => `?${status === 'closed' ? 'status=closed&' : ''}view=${v}`; %>
+<div class="head"><div><h1>Projects</h1><p class="muted" style="margin:0"><%= projects.length %> <%= status === 'closed' ? 'completed' : 'active' %> project<%= projects.length === 1 ? '' : 's' %></p></div><% if (can('project_create')) { %><a class="btn" href="/projects/new">+ New project</a><% } %></div>
+<div class="head" style="margin-bottom:14px">
+  <div class="seg"><a href="/projects<%= view === 'list' ? '?view=list' : '' %>" class="<%= status==='active'?'on':'' %>">Active</a><a href="/projects?status=closed<%= view === 'list' ? '&view=list' : '' %>" class="<%= status==='closed'?'on':'' %>">Completed / archived</a></div>
+  <div class="seg"><a href="<%= vq('grid') %>" class="<%= view==='grid'?'on':'' %>">Cards</a><a href="<%= vq('list') %>" class="<%= view==='list'?'on':'' %>">List</a></div>
+</div>
+<% if (view === 'grid') { %>
+<div class="proj-grid">
+<% projects.forEach(p => { const ph = projectPhoto(p); %>
+  <a class="proj-card" href="/projects/<%= p.id %>">
+    <div class="proj-img"><img src="<%= ph.url %>" alt="Site photo of <%= p.name %>" loading="lazy">
+      <% if (!ph.uploaded) { %><span class="site-tag">Sample image</span><% } %><span class="proj-type"><%= C.PROJECT_TYPES[p.type] ? C.PROJECT_TYPES[p.type].name : p.type %> · <%= p.subtype %></span></div>
+    <div class="proj-body">
+      <div class="proj-title"><b><%= p.name %></b><span class="muted small"><%= p.code %></span></div>
+      <div class="muted small"><%= p.client_name || 'No client set' %><%= p.location ? ' · ' + p.location : '' %></div>
+      <div class="proj-phase small"><%= p.prog.active ? p.prog.active.name : (p.status === 'closed' ? 'Closed' : p.prog.allComplete ? 'All phases complete' : '—') %></div>
+      <div class="mini-progress"><div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div><span><%= p.prog.pct %>%</span></div>
+      <div class="proj-foot small muted"><span><%= C.SCOPES[p.scope] %></span><span><%= p.manager ? p.manager.name : '—' %> · due <%= fmtDate(p.end_date) %></span></div>
+    </div>
+  </a>
+<% }) %>
+<% if (!projects.length) { %><div class="card empty" style="grid-column:1/-1">No projects.<% if (can('project_create') && status === 'active') { %> <a href="/projects/new">Create your first project</a>.<% } %></div><% } %>
+</div>
+<% } else { %>
 <div class="card table-card"><div class="tablewrap"><table><tr><th>Project</th><th>Type</th><th>Scope</th><th>Manager</th><th>Current phase</th><th style="width:160px">Progress</th><th>Target end</th></tr>
-<% projects.forEach(p => { %><tr><td><a href="/projects/<%= p.id %>" style="color:var(--ink)"><b><%= p.name %></b></a><div class="muted small"><%= p.code %><%= p.client_name ? ' · ' + p.client_name : '' %></div></td>
+<% projects.forEach(p => { %><tr><td><a class="proj-cell" href="/projects/<%= p.id %>"><img class="thumb" src="<%= projectPhoto(p).url %>" alt="" loading="lazy"><span><b><%= p.name %></b><span class="muted small"><%= p.code %><%= p.client_name ? ' · ' + p.client_name : '' %></span></span></a></td>
 <td><%= C.PROJECT_TYPES[p.type] ? C.PROJECT_TYPES[p.type].name : p.type %><div class="muted small"><%= p.subtype %></div></td><td><%= C.SCOPES[p.scope] %></td><td><%= p.manager ? p.manager.name : '—' %></td>
 <td><%= p.prog.active ? p.prog.active.name : (p.status === 'closed' ? 'Closed' : p.prog.allComplete ? 'All complete' : '—') %></td>
 <td><div class="mini-progress"><div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div><span><%= p.prog.pct %>%</span></div></td><td class="nowrap"><%= fmtDate(p.end_date) %></td></tr><% }) %>
 <% if (!projects.length) { %><tr><td colspan="7" class="empty">No projects.</td></tr><% } %></table></div></div>
+<% } %>
 <%- include('../partials/foot') %>

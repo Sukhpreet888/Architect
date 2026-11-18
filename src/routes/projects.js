@@ -4,7 +4,20 @@ const db = require('../db');
 const N = require('../notify');
 const S = require('../services');
 const { PROJECT_TYPES, AREA_UNITS, SCOPES } = require('../config');
-const { requireOrg, perm, loadProject, projectOpen, httpError } = require('../mw');
+const { requireOrg, perm, loadProject, projectOpen, httpError, back } = require('../mw');
+const { single, IMG_EXT } = require('../upload');
+const storage = require('../storage');
+
+const MAX_PHOTO = 15 * 1024 * 1024;
+/** Validate an uploaded site photo; returns an error message (and discards the file) or null. */
+async function checkPhoto(req) {
+  if (!req.file) return req.uploadError || null;
+  if (!/^image\//.test(req.file.mimetype || '') || req.file.size > MAX_PHOTO) {
+    await storage.remove(req.file.filename); const f = req.file; req.file = undefined;
+    return f.size > MAX_PHOTO ? 'The site photo must be 15 MB or smaller.' : 'The site photo must be a JPG, PNG or WebP image.';
+  }
+  return null;
+}
 const { num, int, arr, isDate, today, mapSeq, filterSeq, parseTemplate } = require('../util');
 
 router.use('/projects', requireOrg);
@@ -49,7 +62,7 @@ router.get('/projects/new/step2', perm('project_create'), async (req, res) => {
       .map((t) => ({ ...t, phases: parseTemplate(t.body).phases })),
   });
 });
-router.post('/projects', perm('project_create'), async (req, res) => {
+router.post('/projects', perm('project_create'), single('photo', IMG_EXT), async (req, res) => {
   const draft = req.session.projectDraft;
   if (!draft) return res.redirect('/projects/new');
   const usage = await S.orgUsage(req.org.id);
@@ -64,6 +77,7 @@ router.post('/projects', perm('project_create'), async (req, res) => {
   if (managerId && !await S.isOrgUser(req.org.id, managerId)) errors.push('Invalid project manager.');
   if (b.phases_submitted && !arr(b.phases).length) errors.push('Select at least one phase for the project.');
   if (errors.length) {
+    if (req.file) await storage.remove(req.file.filename);
     req.flash('error', errors.join(' '));
     return res.redirect('/projects/new/step2');
   }
@@ -73,7 +87,14 @@ router.post('/projects', perm('project_create'), async (req, res) => {
     manager_id: managerId || req.user.id, contract_value: b.contract_value ? num(b.contract_value) : null,
     construction_budget: b.scope === 'design_construction' ? num(b.construction_budget) : 0, template_id: int(b.template_id),
   };
-  const id = await S.createProjectWithWorkflow(req.org.id, req.user.id, data, arr(b.members).map(Number), arr(b.phases).map(Number));
+  const photoError = await checkPhoto(req);
+  if (req.file) Object.assign(data, { photo_name: req.file.filename, photo_size: req.file.size });
+  let id;
+  try { id = await S.createProjectWithWorkflow(req.org.id, req.user.id, data, arr(b.members).map(Number), arr(b.phases).map(Number)); } catch (e) {
+    if (req.file) await storage.remove(req.file.filename);
+    throw e;
+  }
+  if (photoError) req.flash('error', `Project created, but the site photo was not saved: ${photoError}`);
   req.session.projectDraft = undefined;
   const project = await db.get('SELECT * FROM projects WHERE id = ?', id);
   await N.projectCreated(project, req.user);
@@ -264,6 +285,28 @@ router.post('/projects/:pid/phases/:phid/remove', loadProject, projectOpen, load
   await S.removePhase(req.project, req.phase);
   req.flash('success', `Phase "${req.phase.name}" removed from the project.`);
   res.redirect(back);
+});
+
+// ---- Project / site photo
+router.get('/projects/:pid/photo', loadProject, async (req, res, next) => {
+  if (!req.project.photo_name || !(await storage.sendInline(res, req.project.photo_name))) return next(httpError(404, 'No site photo.'));
+});
+router.post('/projects/:pid/photo', loadProject, projectOpen, perm('project_manage'), single('photo', IMG_EXT), async (req, res) => {
+  const err = await checkPhoto(req);
+  if (!req.file) { req.flash('error', err || 'Choose a photo to upload.'); return res.redirect(back(req, `/projects/${req.project.id}`)); }
+  const old = req.project.photo_name;
+  await db.run('UPDATE projects SET photo_name = ?, photo_size = ? WHERE id = ?', req.file.filename, req.file.size, req.project.id);
+  if (old) await storage.remove(old);
+  req.flash('success', 'Site photo updated.');
+  res.redirect(back(req, `/projects/${req.project.id}`));
+});
+router.post('/projects/:pid/photo/remove', loadProject, projectOpen, perm('project_manage'), async (req, res) => {
+  if (req.project.photo_name) {
+    await db.run('UPDATE projects SET photo_name = NULL, photo_size = 0 WHERE id = ?', req.project.id);
+    await storage.remove(req.project.photo_name);
+  }
+  req.flash('success', 'Site photo removed.');
+  res.redirect(back(req, `/projects/${req.project.id}`));
 });
 
 module.exports = router;

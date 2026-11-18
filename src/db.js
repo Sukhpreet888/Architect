@@ -91,7 +91,7 @@ function ready() {
       if (!r.rows[0] || !r.rows[0].t) await driver.exec(SCHEMA);
       // upgrades for databases created by older versions (only run when the newest change is missing)
       const m = await driver.query(`SELECT 1 FROM information_schema.columns
-        WHERE table_schema = 'archflow' AND table_name = 'expenditures' AND column_name = 'visit_id'`, []);
+        WHERE table_schema = 'archflow' AND table_name = 'projects' AND column_name = 'photo_size'`, []);
       if (!m.rows.length) await driver.exec(MIGRATIONS);
     })().catch((e) => { readyPromise = null; throw e; });
   }

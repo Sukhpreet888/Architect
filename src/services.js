@@ -25,7 +25,8 @@ async function orgUsage(orgId) {
   const docBytes = (await db.get(`SELECT COALESCE(SUM(v.size),0) s FROM document_versions v JOIN documents d ON d.id = v.document_id
     JOIN projects p ON p.id = d.project_id WHERE p.org_id = ?`, orgId)).s;
   const proofBytes = (await db.get(`SELECT COALESCE(SUM(pay.proof_size),0) s FROM payments pay JOIN invoices i ON i.id = pay.invoice_id WHERE i.org_id = ?`, orgId)).s;
-  return { users, pendingInvites, projects, storageBytes: Number(docBytes) + Number(proofBytes) };
+  const photoBytes = (await db.get('SELECT COALESCE(SUM(photo_size),0) s FROM projects WHERE org_id = ?', orgId)).s;
+  return { users, pendingInvites, projects, storageBytes: Number(docBytes) + Number(proofBytes) + Number(photoBytes) };
 }
 function subscriptionState(org) {
   const t = today();

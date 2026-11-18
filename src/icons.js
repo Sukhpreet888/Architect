@@ -22,6 +22,11 @@ const P = {
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   home: '<path d="m3 11 9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>',
+  camera: '<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>',
+  coins: '<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3V7"/><path d="M15 11.5c3.4.2 6 1.5 6 3V18c0 1.7-2.7 3-6 3-2.2 0-4.1-.6-5.2-1.5"/>',
+  hardhat: '<path d="M3 18h18v-2a9 9 0 0 0-18 0z"/><path d="M10 7V5h4v2M7 11V8.5M17 11V8.5"/>',
+  check: '<path d="m5 12 5 5 9-10"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
   doc: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
 };
 function icon(name, cls = 'ico') {

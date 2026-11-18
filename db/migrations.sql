@@ -10,3 +10,6 @@ CREATE TABLE IF NOT EXISTS archflow.cost_budgets (
   amount double precision NOT NULL DEFAULT 0, PRIMARY KEY(project_id, category)
 );
 ALTER TABLE archflow.cost_budgets ENABLE ROW LEVEL SECURITY;
+-- 2026-11: project / site photo
+ALTER TABLE archflow.projects ADD COLUMN IF NOT EXISTS photo_name TEXT;
+ALTER TABLE archflow.projects ADD COLUMN IF NOT EXISTS photo_size bigint NOT NULL DEFAULT 0;

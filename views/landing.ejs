@@ -1,24 +1,116 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ARCHFLOW — Architecture practice management</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="/static/style.css"></head>
-<body class="landing"><div class="wrap">
-  <div style="display:flex;justify-content:space-between;align-items:center"><a class="brand" href="/" style="display:flex;align-items:center;gap:10px;color:var(--ink);font-weight:700;font-size:18px;text-decoration:none"><%- logo() %> archflow</a>
-  <div><a href="/login" style="font-weight:600;margin-right:12px">Sign in</a><a class="btn" href="/register">Start 15-day free trial</a></div></div>
-  <h1>Run every architecture project — from brief to handover — in one workspace.</h1>
-  <p class="lead">Phase-based workflows, tasks, drawings with version history, client approvals, invoices and construction tracking. Reminders and notifications go out automatically by email — no apps for your clients to install.</p>
-  <p><a class="btn" href="/register">Create your workspace</a></p>
-  <div class="grid g3" style="margin-top:40px">
-    <div class="f"><b>10-phase workflow</b><p class="small">Generate phases, subphases, tasks, deliverables and approvals from reusable, versioned templates.</p></div>
-    <div class="f"><b>Documents & drawings</b><p class="small">PDF, DWG, DXF, images, DOCX, XLSX — each revision kept, linked to tasks and deliverables.</p></div>
-    <div class="f"><b>Client receivables</b><p class="small">Invoices with automatic email reminders 3 days before, on the due date, and 3 / 7 / 15 days after.</p></div>
-    <div class="f"><b>Approvals & reviews</b><p class="small">Multi-reviewer decisions — approved, revision required or rejected — with full history.</p></div>
-    <div class="f"><b>Construction</b><p class="small">Budgets, expenditure approval, materials & reorder alerts, site visits and rectification tasks.</p></div>
-    <div class="f"><b>Reports</b><p class="small">Project, organisation and financial reports with Excel and PDF export.</p></div>
+<meta name="description" content="Run every architecture project — residential, commercial, apartments and villas — from brief to handover: phases, tasks, drawings, approvals, invoices, costs and construction, with automatic email reminders.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/landing.css"></head>
+<body class="lp">
+
+<header class="lp-nav">
+  <div class="lp-wrap lp-nav-in">
+    <a class="lp-logo" href="/"><%- logo() %><span>archflow</span></a>
+    <nav class="lp-links"><a href="#projects">Projects</a><a href="#workflow">Workflow</a><a href="#features">Features</a><a href="#pricing">Pricing</a></nav>
+    <div class="lp-cta"><a class="lp-signin" href="/login">Sign in</a><a class="btn" href="/register">Start free trial</a></div>
   </div>
-  <h2 style="margin-top:48px">Pricing</h2>
-  <div class="plans">
-  <% plans.forEach(p => { %><div class="plan"><h2 style="margin:0"><%= p.name %></h2><div class="p"><%= p.price ? '$' + p.price : 'Custom' %><span class="muted small"><%= p.price ? '/mo' : '' %></span></div>
-  <ul><li><%= p.blurb %></li><li>All modules included</li><li>Email reminders everywhere</li></ul><a class="btn" href="/register">Start free trial</a></div><% }) %>
+</header>
+
+<section class="lp-hero">
+  <div class="lp-wrap lp-hero-in">
+    <div class="lp-hero-copy">
+      <span class="lp-eyebrow">For architects, designers &amp; build teams</span>
+      <h1>Design, build and deliver every project — <span>from brief to handover.</span></h1>
+      <p class="lp-lead">ARCHFLOW brings phases, tasks, drawings, client approvals, invoices, site costs and construction into one workspace — with automatic email reminders, so nothing slips.</p>
+      <div class="lp-actions"><a class="btn lp-btn-lg" href="/register">Start your 15-day free trial <%- icon('arrow') %></a><a class="lp-ghost" href="#projects">See what you can run</a></div>
+      <ul class="lp-trust"><li><%- icon('check') %> No card needed during the trial</li><li><%- icon('check') %> Set up in minutes</li><li><%- icon('check') %> Email reminders built in</li></ul>
+    </div>
+    <div class="lp-hero-art" aria-hidden="true">
+      <img class="lp-art-main" src="/static/img/villa.jpg" alt="">
+      <img class="lp-art-a" src="/static/img/residential.jpg" alt="">
+      <img class="lp-art-b" src="/static/img/commercial.jpg" alt="">
+      <div class="lp-float lp-float-1"><div class="lp-mini-donut"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" fill="none" stroke="#e8f6f0" stroke-width="5"/><circle cx="18" cy="18" r="15" fill="none" stroke="#0f8a5f" stroke-width="5" stroke-linecap="round" stroke-dasharray="56 95" transform="rotate(-90 18 18)"/></svg></div>
+        <div><b>Villa Serenity</b><span>Design Development · 60%</span></div></div>
+      <div class="lp-float lp-float-2"><span class="lp-dot"></span><div><b>Invoice paid</b><span>₹1,41,600 · reminders stopped</span></div></div>
+      <div class="lp-float lp-float-3"><%- icon('approvals') %><div><b>Facade approved</b><span>2 of 2 reviewers</span></div></div>
+    </div>
   </div>
-  <p class="small" style="margin-top:40px;color:var(--muted)">© ARCHFLOW</p>
-</div></body></html>
+</section>
+
+<section class="lp-section" id="projects">
+  <div class="lp-wrap">
+    <div class="lp-head"><span class="lp-eyebrow">Built for every kind of project</span><h2>One workspace for homes, offices, apartments and villas</h2>
+      <p>Start from a 10-phase workflow template, keep only the phases each project needs, and track every drawing, approval and rupee.</p></div>
+    <div class="lp-types">
+      <% [
+        ['residential', 'Residential', 'Requirements, site analysis, concept, drawings, approvals, execution.'],
+        ['commercial', 'Commercial', 'Feasibility, space planning, MEP, fire safety, statutory approvals, tendering.'],
+        ['apartment', 'Apartment', 'Unit planning, circulation, parking, services, structural coordination, approvals.'],
+        ['villa', 'Villa', 'Landscape, interiors, façade, lighting, bespoke detailing and execution.'],
+      ].forEach(([img, name, text]) => { %>
+      <article class="lp-type">
+        <div class="lp-type-img"><img src="/static/img/<%= img %>.jpg" alt="<%= name %> architecture project" loading="lazy"></div>
+        <h3><%= name %></h3><p><%= text %></p>
+      </article>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<section class="lp-section lp-alt" id="workflow">
+  <div class="lp-wrap">
+    <div class="lp-head"><span class="lp-eyebrow">How it works</span><h2>From the first meeting to the keys</h2></div>
+    <ol class="lp-steps">
+      <li><span>1</span><b>Brief &amp; site</b><p>Create the project, pick its phases and upload a site photo.</p></li>
+      <li><span>2</span><b>Design</b><p>Tasks, drawings with full revision history, and internal reviews.</p></li>
+      <li><span>3</span><b>Approvals</b><p>Client &amp; team sign-offs with comments, rounds and email reminders.</p></li>
+      <li><span>4</span><b>Construction</b><p>Daily, labour, material and site-supervision costs against budget.</p></li>
+      <li><span>5</span><b>Handover</b><p>Closure checklist, closure report and an archived project.</p></li>
+    </ol>
+  </div>
+</section>
+
+<section class="lp-section" id="features">
+  <div class="lp-wrap">
+    <div class="lp-head"><span class="lp-eyebrow">Everything in one place</span><h2>Tools your whole practice will use</h2></div>
+    <div class="lp-features">
+      <% [
+        ['templates', 'Phase tracker', 'Pick the phases each project needs; completion is tracked automatically as tasks get done.'],
+        ['doc', 'Drawings & documents', 'PDF, DWG, DXF, images — every revision kept, linked to tasks and deliverables.'],
+        ['approvals', 'Approvals & reviews', 'Multi-reviewer decisions with comments, revision rounds and full history.'],
+        ['payments', 'Client invoices', 'Automatic reminders 3 days before, on the due date and 3 / 7 / 15 days after.'],
+        ['coins', 'Cost management', 'Daily, labour, material and site-supervision costs with budgets and approvals.'],
+        ['hardhat', 'Construction & site', 'Materials, reorder alerts, site visits, inspection reports and snag fixes.'],
+        ['reports', 'Reports', 'Project, organisation and financial reports — export to Excel or PDF.'],
+        ['mail', 'Email-first', 'Every reminder and notification goes out by email — clients need no app.'],
+      ].forEach(([ic, t, d]) => { %>
+      <div class="lp-feature"><div class="lp-ic"><%- icon(ic) %></div><b><%= t %></b><p><%= d %></p></div>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<section class="lp-band">
+  <img src="/static/img/apartment.jpg" alt="" aria-hidden="true">
+  <div class="lp-wrap lp-band-in">
+    <div><h2>Your site, on every screen</h2><p>Upload a photo of each project site — it appears on your dashboard and project list, so the whole team knows exactly which job they're looking at.</p></div>
+    <a class="btn lp-btn-lg" href="/register">Create your workspace</a>
+  </div>
+</section>
+
+<section class="lp-section" id="pricing">
+  <div class="lp-wrap">
+    <div class="lp-head"><span class="lp-eyebrow">Pricing</span><h2>Start free for 15 days — no card needed</h2><p>Every plan includes all modules and email reminders. Add a card only when your trial ends.</p></div>
+    <div class="lp-plans">
+      <% plans.forEach(p => { const pop = p.key === 'studio'; %>
+      <div class="lp-plan <%= pop ? 'pop' : '' %>"><% if (pop) { %><span class="lp-badge">Most popular</span><% } %>
+        <h3><%= p.name %></h3>
+        <div class="lp-price"><%= p.price ? '$' + p.price : 'Custom' %><small><%= p.price ? '/month' : '' %></small></div>
+        <ul><li><%- icon('check') %><%= p.users ? p.users + ' user' + (p.users > 1 ? 's' : '') : 'Custom users' %></li><li><%- icon('check') %><%= p.projects ? p.projects + ' active projects' : 'Custom projects' %></li>
+          <li><%- icon('check') %><%= p.storageMb ? (p.storageMb / 1024) + ' GB storage' : 'Custom storage' %></li><li><%- icon('check') %>All modules &amp; email reminders</li></ul>
+        <a class="btn <%= pop ? '' : 'lp-btn-outline' %>" href="/register">Start free trial</a>
+      </div>
+      <% }) %>
+    </div>
+  </div>
+</section>
+
+<footer class="lp-foot"><div class="lp-wrap lp-foot-in"><a class="lp-logo" href="/"><%- logo() %><span>archflow</span></a><span>© <%= new Date().getFullYear() %> ARCHFLOW · Architecture practice management</span><span><a href="/login">Sign in</a> · <a href="/register">Start free trial</a></span></div></footer>
+</body></html>

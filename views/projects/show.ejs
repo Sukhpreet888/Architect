@@ -1,5 +1,22 @@
 <%- include('../partials/head') %>
 <%- include('../partials/project-nav') %>
+<% const ph = projectPhoto(project); const canPhoto = can('project_manage') && project.status === 'active'; %>
+<div class="site-hero">
+  <img src="<%= ph.url %>" alt="Site photo of <%= project.name %>">
+  <div class="site-hero-shade"></div>
+  <div class="site-hero-info">
+    <div><span class="site-hero-label"><%- icon('camera') %> <%= ph.uploaded ? 'Site photo' : 'Sample image — no site photo yet' %></span>
+      <div class="site-hero-loc"><%= project.location || 'Location not set' %></div></div>
+    <% if (canPhoto) { %>
+    <div class="site-hero-actions">
+      <form method="post" action="/projects/<%= project.id %>/photo" enctype="multipart/form-data" class="inline" id="photo-form">
+        <label class="btn sm photo-btn"><%- icon('camera') %> <%= ph.uploaded ? 'Change photo' : 'Upload site photo' %>
+          <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" hidden onchange="this.form.submit()"></label>
+      </form>
+      <% if (ph.uploaded) { %><form method="post" action="/projects/<%= project.id %>/photo/remove" class="inline" data-confirm="Remove the site photo?"><button class="btn sm grey">Remove</button></form><% } %>
+    </div><% } %>
+  </div>
+</div>
 <div class="grid g4">
   <a class="kpi" href="/projects/<%= project.id %>/phases" style="display:flex;gap:12px;align-items:center;color:inherit;text-decoration:none"><%- include('../partials/donut', { pct: prog.pct, size: 72, label: 'done' }) %><div><div class="l">Project completion</div><div class="muted small"><%= prog.phases.filter(p => p.status === 'completed').length %>/<%= prog.applicable %> phases complete</div></div></a>
   <div class="kpi"><div class="l">Active phase</div><div class="v" style="font-size:16px"><%= prog.active ? prog.active.name : (prog.allComplete ? 'All complete' : '—') %></div><% if (prog.active) { %><%- badge(prog.active.status) %><% } %></div>

@@ -1,6 +1,6 @@
 <%- include('../partials/head') %>
 <h1>Create new project</h1><p class="muted"><b>Step 2 of 2:</b> Project information — <%= C.PROJECT_TYPES[draft.type].name %> · <%= draft.subtype %> · plot <%= draft.plot_area %> <%= C.AREA_UNITS[draft.area_unit] %> <a href="/projects/new" class="small">(change)</a></p>
-<form method="post" action="/projects">
+<form method="post" action="/projects" enctype="multipart/form-data">
 <div class="grid g2">
 <div class="card">
   <h2>Project details</h2>
@@ -9,6 +9,8 @@
   <label>Description</label><textarea name="description"></textarea>
   <div class="row"><div><label>Start date</label><input type="date" name="start_date" value="<%= form.start_date %>"></div><div><label>Target end date</label><input type="date" name="end_date"></div></div>
   <label>Contract / fee value <span class="muted">(<%= org.currency %>)</span></label><input type="number" step="any" min="0" name="contract_value">
+  <label>Site photo <span class="muted">(optional — JPG, PNG or WebP, up to 15 MB)</span></label>
+  <div class="photo-pick"><img id="photo-preview" alt="" hidden><input type="file" name="photo" accept="image/jpeg,image/png,image/webp" onchange="const f=this.files[0],i=document.getElementById('photo-preview');if(f){i.src=window.URL.createObjectURL(f);i.hidden=false}else{i.hidden=true}"></div>
   <h2 style="margin-top:18px">Client</h2>
   <label>Client name</label><input name="client_name">
   <div class="row"><div><label>Client email <span class="muted">(invoices & reminders)</span></label><input type="email" name="client_email"></div><div><label>Client phone</label><input name="client_phone"></div></div>

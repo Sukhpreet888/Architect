@@ -26,6 +26,22 @@
   <% } else { %><div><div class="l">Reviews awaiting me</div><div class="v"><%= myReviews.length %> <span class="pill <%= myReviews.length ? 'warn' : 'good' %>"><%= myReviews.length ? 'Pending' : 'Clear' %></span></div><div class="sub">Approval requests</div></div><% } %>
 </div>
 
+<% if (projects.length) { %>
+<div class="card site-strip-card">
+  <div class="card-head"><span class="chip-ico"><%- icon('camera') %></span><div class="grow"><h2>Project sites</h2><p>Latest site photo of each active project</p></div><a class="small" href="/projects">All projects →</a></div>
+  <div class="site-strip">
+  <% projects.slice(0, 8).forEach(p => { const ph = projectPhoto(p); %>
+    <a class="site-card" href="/projects/<%= p.id %>">
+      <div class="site-img"><img src="<%= ph.url %>" alt="Site photo of <%= p.name %>" loading="lazy"><% if (!ph.uploaded) { %><span class="site-tag">Sample image</span><% } %>
+        <span class="site-pct"><%= p.prog.pct %>%</span></div>
+      <div class="site-meta"><b><%= p.name %></b><span><%= p.prog.active ? p.prog.active.name : (p.prog.allComplete ? 'All phases complete' : p.code) %></span>
+        <div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div></div>
+    </a>
+  <% }) %>
+  </div>
+</div>
+<% } %>
+
 <div class="dash-grid">
 <div>
   <!-- Project performance -->
@@ -85,7 +101,7 @@
     <div class="tablewrap"><table>
       <tr><th>No</th><th>Project</th><th>Client / location</th><th>Current phase</th><th>Health</th><th style="width:170px">Progress</th></tr>
       <% projects.slice(0, 6).forEach((p, i) => { %>
-      <tr><td class="muted"><%= i + 1 %></td><td><a href="/projects/<%= p.id %>" style="color:var(--ink);font-weight:600"><%= p.name %></a><div class="muted small"><%= p.code %></div></td>
+      <tr><td class="muted"><%= i + 1 %></td><td><a class="proj-cell" href="/projects/<%= p.id %>"><img class="thumb" src="<%= projectPhoto(p).url %>" alt="" loading="lazy"><span><b><%= p.name %></b><span class="muted small"><%= p.code %></span></span></a></td>
         <td class="small"><%= p.client_name || '—' %><div class="muted"><%= p.location || '' %></div></td>
         <td class="small"><%= p.prog.active ? p.prog.active.name : (p.prog.allComplete ? 'All phases complete' : '—') %></td>
         <td><%- p.health === 'at_risk' ? badge('overdue', 'At risk') : p.health === 'on_track' ? badge('in_progress') : badge('draft', 'Not started') %></td>
