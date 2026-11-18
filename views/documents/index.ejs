@@ -1,0 +1,27 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const base = `/projects/${project.id}`; %>
+<% if (project.status === 'active' && can('doc_upload')) { %>
+<details class="card" <%= docs.length ? '' : 'open' %>><summary>+ Upload document / drawing</summary>
+<form method="post" action="<%= base %>/documents" enctype="multipart/form-data">
+  <div class="row"><div><label>Title</label><input name="title" placeholder="e.g. Ground floor plan"></div>
+  <div><label>Phase</label><select name="phase_id"><option value="">—</option><% phases.filter(p => p.status !== 'na').forEach(p => { %><option value="<%= p.id %>" <%= phaseFilter===p.id?'selected':'' %>><%= p.seq %>. <%= p.name %></option><% }) %></select></div>
+  <div><label>Category</label><select name="category"><% ['Drawing','Presentation','Report','Specification','Contract','Photo','Other'].forEach(c => { %><option><%= c %></option><% }) %></select></div></div>
+  <div class="row"><div><label>Link to task</label><select name="task_id"><option value="">—</option><% tasks.forEach(t => { %><option value="<%= t.id %>"><%= t.title %></option><% }) %></select></div>
+  <div><label>Link to deliverable</label><select name="deliverable_id"><option value="">—</option><% deliverables.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div></div>
+  <label>File <span class="muted">(PDF, DWG, DXF, JPG, PNG, DOCX, XLSX… up to 100 MB)</span></label><input type="file" name="file" required>
+  <label>Revision notes</label><input name="notes">
+  <% if (can('doc_restricted')) { %><label style="font-weight:400"><input type="checkbox" name="restricted" value="1"> Restricted — visible to Admin / PM / Lead Architect only</label><% } %>
+  <p><button class="btn">Upload</button></p>
+</form></details><% } %>
+<div class="seg" style="margin-bottom:12px;flex-wrap:wrap"><a href="?" class="<%= !phaseFilter ? 'on' : '' %>">All phases</a><% phases.filter(p => p.status !== 'na').forEach(p => { %><a href="?phase=<%= p.id %>" class="<%= phaseFilter===p.id?'on':'' %>"><%= p.seq %></a><% }) %></div>
+<% phases.filter(p => !phaseFilter || p.id === phaseFilter).forEach(p => { const list = docs.filter(d => d.phase_id === p.id); if (!list.length) return; %>
+<div class="card"><h2><%= p.seq %>. <%= p.name %></h2>
+<div class="tablewrap"><table><tr><th>Document</th><th>Rev</th><th>File</th><th>Linked to</th><th>Updated</th><th></th></tr>
+<% list.forEach(d => { %><tr><td><a href="<%= base %>/documents/<%= d.id %>"><b><%= d.title %></b></a> <% if (d.restricted) { %><span class="badge b-amber">Restricted</span><% } %><div class="muted small"><%= d.category || '' %></div></td><td><span class="badge b-blue">R<%= d.rev %></span></td>
+<td class="small"><%= d.original_name %><div class="muted"><%= fmtBytes(d.size) %></div></td><td class="small"><%= d.task_title ? 'Task: ' + d.task_title : '' %><%= d.deliverable_name ? ' Deliverable: ' + d.deliverable_name : '' %></td>
+<td class="small nowrap"><%= fmtDate(d.updated_at) %><div class="muted"><%= d.uploader %></div></td><td><a class="btn sm ghost" href="<%= base %>/documents/<%= d.id %>">Open</a></td></tr><% }) %></table></div></div>
+<% }) %>
+<% const unphased = docs.filter(d => !d.phase_id); if (!phaseFilter && unphased.length) { %><div class="card"><h2>General</h2><% unphased.forEach(d => { %><div><a href="<%= base %>/documents/<%= d.id %>"><%= d.title %></a> <span class="badge">R<%= d.rev %></span></div><% }) %></div><% } %>
+<% if (!docs.length) { %><div class="card empty">No documents yet.</div><% } %>
+<%- include('../partials/foot') %>

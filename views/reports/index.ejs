@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<h1>Reports & analytics</h1>
+<div class="grid g3" style="margin-top:12px">
+  <div class="card"><h2>Organisation report</h2><p class="muted small">Project portfolio, team workload, construction expenditure.</p>
+    <a class="btn sm" href="/reports/organisation">View</a> <a class="btn sm ghost" href="/reports/organisation?format=xlsx">Excel</a> <a class="btn sm ghost" href="/reports/organisation?format=pdf">PDF</a></div>
+  <% if (can('financial_reports')) { %><div class="card"><h2>Financial report</h2><p class="muted small">Payments, collection rate (<%= pay.collectionRate %>%), ageing, invoices, receipts.</p>
+    <a class="btn sm" href="/reports/financial">View</a> <a class="btn sm ghost" href="/reports/financial?format=xlsx">Excel</a> <a class="btn sm ghost" href="/reports/financial?format=pdf">PDF</a></div><% } %>
+</div>
+<div class="card tablewrap"><h2>Project reports</h2><p class="muted small">Progress, phases, tasks, approvals and costs per project.</p>
+<table><tr><th>Project</th><th>Status</th><th>Progress</th><th></th></tr>
+<% projects.forEach(p => { %><tr><td><%= p.code %> · <%= p.name %></td><td><%- badge(p.status) %></td><td><%= p.prog.pct %>%</td><td class="nowrap right"><a class="btn sm" href="/reports/projects/<%= p.id %>">View</a> <a class="btn sm ghost" href="/reports/projects/<%= p.id %>?format=xlsx">Excel</a> <a class="btn sm ghost" href="/reports/projects/<%= p.id %>?format=pdf">PDF</a></td></tr><% }) %>
+<% if (!projects.length) { %><tr><td colspan="4" class="empty">No projects.</td></tr><% } %></table></div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,15 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<p class="muted">Phase tracker — <%= prog.done %> of <%= prog.applicable %> applicable phases complete (<%= prog.pct %>%).</p>
+<div class="bar" style="margin-bottom:16px"><i style="width:<%= prog.pct %>%"></i></div>
+<div class="phases">
+<% prog.phases.forEach(ph => { const s = byPhase[ph.id] || { total: 0, done: 0 }; %>
+  <a class="phase <%= ph.status %>" href="/projects/<%= project.id %>/phases/<%= ph.id %>" style="color:inherit;text-decoration:none">
+    <div class="n">PHASE <%= ph.seq %></div><b><%= ph.name %></b>
+    <div style="margin:6px 0"><%- badge(ph.status === 'na' ? 'cancelled' : ph.status, ph.status === 'na' ? 'Not applicable' : null) %></div>
+    <% if (ph.status !== 'na') { %><div class="small muted"><%= fmtDate(ph.planned_start) %> → <%= fmtDate(ph.planned_end) %></div>
+    <div class="small"><%= s.done || 0 %>/<%= s.total %> tasks</div><div class="bar"><i style="width:<%= s.total ? Math.round((s.done||0)/s.total*100) : 0 %>%"></i></div><% } %>
+  </a>
+<% }) %>
+</div>
+<%- include('../partials/foot') %>

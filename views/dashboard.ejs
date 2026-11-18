@@ -1,0 +1,43 @@
+<%- include('partials/head') %>
+<div class="head"><div><h1>Organisation dashboard</h1><p class="muted">Welcome back, <%= user.name.split(' ')[0] %>.</p></div>
+<% if (can('project_create')) { %><a class="btn" href="/projects/new">+ New project</a><% } %></div>
+<div class="grid g4">
+  <div class="kpi"><div class="l">Active projects</div><div class="v"><%= projects.length %></div><div class="muted small">Limit <%= limits.projects %></div></div>
+  <div class="kpi <%= overdueTasks ? 'red' : '' %>"><div class="l">Overdue tasks</div><div class="v"><%= overdueTasks %></div><div class="muted small"><%= dueSoon %> due in 3 days</div></div>
+  <div class="kpi <%= myReviews.length ? 'amber' : '' %>"><div class="l">Reviews awaiting me</div><div class="v"><%= myReviews.length %></div></div>
+  <% if (pay) { %><div class="kpi"><div class="l">Collection rate</div><div class="v"><%= pay.collectionRate %>%</div><div class="muted small"><%= money(pay.overdue) %> overdue</div></div>
+  <% } else { %><div class="kpi"><div class="l">Emails sent today</div><div class="v"><%= emailsToday %></div></div><% } %>
+</div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h2>Active projects</h2>
+    <% if (!projects.length) { %><div class="empty">No projects yet.<% if (can('project_create')) { %> <a href="/projects/new">Create your first project</a>.<% } %></div><% } %>
+    <% projects.slice(0, 8).forEach(p => { %>
+      <div style="padding:8px 0;border-bottom:1px solid var(--line)">
+        <div style="display:flex;justify-content:space-between"><a href="/projects/<%= p.id %>"><b><%= p.name %></b></a><span class="muted small"><%= p.code %></span></div>
+        <div class="muted small"><%= p.prog.active ? p.prog.active.name : (p.prog.allComplete ? 'All phases complete' : '—') %> · <%= p.prog.pct %>%</div>
+        <div class="bar"><i style="width:<%= p.prog.pct %>%"></i></div>
+      </div>
+    <% }) %>
+  </div>
+  <div class="card"><h2>My tasks</h2>
+    <% if (!myTasks.length) { %><div class="empty">Nothing assigned to you.</div><% } %>
+    <table><% myTasks.forEach(t => { %><tr><td><a href="/projects/<%= t.project_id %>/tasks/<%= t.id %>"><%= t.title %></a><div class="muted small"><%= t.code %> · <%= t.project_name %></div></td>
+      <td class="nowrap"><%= fmtDate(t.due_date) %> <% if (t.due_date && t.due_date < U.today()) { %><%- badge('overdue') %><% } %></td><td><%- badge(t.status) %></td></tr><% }) %></table>
+  </div>
+  <div class="card"><h2>Awaiting my review</h2>
+    <% if (!myReviews.length) { %><div class="empty">No pending reviews.</div><% } %>
+    <% myReviews.forEach(a => { %><div style="padding:6px 0;border-bottom:1px solid var(--line)"><a href="/projects/<%= a.project_id %>/approvals/<%= a.id %>"><%= a.title %></a> <span class="muted small">· <%= a.code %></span></div><% }) %>
+  </div>
+  <% if (pay) { %><div class="card"><h2>Receivables</h2>
+    <div class="grid g2"><div><div class="muted small">Received</div><b><%= money(pay.received) %></b></div><div><div class="muted small">Outstanding</div><b><%= money(pay.pending + pay.overdue) %></b></div></div>
+    <h3>Overdue invoices</h3>
+    <% if (!overdueInvoices.length) { %><div class="muted">None 🎉</div><% } %>
+    <% overdueInvoices.forEach(i => { %><div><a href="/payments/invoices/<%= i.id %>"><%= i.number %></a> · <%= i.project_name %> · due <%= fmtDate(i.due_date) %></div><% }) %>
+  </div><% } %>
+</div>
+<div class="card"><h2>Modules</h2>
+<div class="grid g5 small">
+  <a href="/org/team">Organisation setup & team</a><a href="/projects/new">Create project</a><a href="/projects">Project execution</a><a href="/payments">Payments</a><a href="/tasks">Task management</a>
+  <a href="/projects">Documents & drawings</a><a href="/approvals">Approvals & reviews</a><a href="/projects">Construction</a><a href="/reports">Reports & analytics</a><a href="/billing">Billing & subscription</a>
+</div></div>
+<%- include('partials/foot') %>

@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<%- include('nav') %>
+<div class="grid g5">
+  <div class="kpi"><div class="l">Receivable</div><div class="v"><%= money(summary.receivable) %></div></div>
+  <div class="kpi green"><div class="l">Received</div><div class="v"><%= money(summary.received) %></div></div>
+  <div class="kpi amber"><div class="l">Pending</div><div class="v"><%= money(summary.pending) %></div></div>
+  <div class="kpi red"><div class="l">Overdue</div><div class="v"><%= money(summary.overdue) %></div></div>
+  <div class="kpi"><div class="l">Collection rate</div><div class="v"><%= summary.collectionRate %>%</div><div class="bar"><i style="width:<%= summary.collectionRate %>%"></i></div></div>
+</div>
+<div class="card" style="margin-top:16px"><b>Automatic email reminders:</b> <span class="muted">3 days before due · on due date · 3, 7 and 15 days after — sent to the client and the project team. Reminders stop when the invoice is paid (or marked disputed).</span></div>
+<div class="grid g2">
+<div class="card"><h2>Due in the next 7 days</h2>
+<table><% upcoming.forEach(i => { %><tr><td><a href="/payments/invoices/<%= i.id %>"><%= i.number %></a><div class="muted small"><%= i.project_name %></div></td><td class="nowrap"><%= fmtDate(i.due_date) %></td><td class="right"><%= money(i.balance) %></td></tr><% }) %>
+<% if (!upcoming.length) { %><tr><td class="empty">Nothing due soon.</td></tr><% } %></table></div>
+<div class="card"><h2>Recent payments</h2>
+<table><% recent.forEach(p => { %><tr><td><%= fmtDate(p.paid_on) %></td><td><a href="/payments/invoices/<%= p.invoice_id %>"><%= p.number %></a><div class="muted small"><%= p.project_name %></div></td><td class="right"><%= money(p.amount) %></td></tr><% }) %>
+<% if (!recent.length) { %><tr><td class="empty">No payments yet.</td></tr><% } %></table></div>
+</div>
+<div class="card"><h2>Latest invoices</h2><%- include('table', { invoices }) %></div>
+<%- include('../partials/foot') %>

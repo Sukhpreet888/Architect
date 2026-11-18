@@ -1,0 +1,15 @@
+<div class="head">
+  <div>
+    <div class="muted small"><a href="/projects">Projects</a> / <%= project.code %></div>
+    <h1><%= project.name %> <%- badge(project.status) %></h1>
+    <div class="muted"><%= C.PROJECT_TYPES[project.type] ? C.PROJECT_TYPES[project.type].name : project.type %> · <%= project.subtype %> · <%= C.SCOPES[project.scope] %><% if (project.client_name) { %> · Client: <%= project.client_name %><% } %></div>
+  </div>
+</div>
+<% const pt = (href, label, show = true) => show ? `<a href="/projects/${project.id}${href}" class="${(href === '' ? path === '/projects/' + project.id : path.startsWith('/projects/' + project.id + href)) ? 'on' : ''}">${label}</a>` : ''; %>
+<div class="tabs">
+  <%- pt('', 'Overview') %><%- pt('/phases', 'Phase tracker') %><%- pt('/tasks', 'Tasks') %><%- pt('/documents', 'Documents & drawings') %><%- pt('/approvals', 'Approvals') %>
+  <% if (can('payments_view')) { %><a href="/payments/invoices?project=<%= project.id %>">Invoices</a><% } %>
+  <%- pt('/construction', 'Construction', project.scope === 'design_construction') %>
+  <a href="/reports/projects/<%= project.id %>" class="<%= path.startsWith('/reports/projects') ? 'on' : '' %>">Report</a>
+  <%- pt('/closure', 'Closure') %>
+</div>

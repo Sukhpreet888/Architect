@@ -1,0 +1,42 @@
+<% const qs = (o) => '?' + new URLSearchParams(Object.assign({}, query, o)).toString(); %>
+<div class="seg" style="margin-bottom:12px"><a href="<%= qs({ view: 'list' }) %>" class="<%= view==='list'?'on':'' %>">List</a><a href="<%= qs({ view: 'kanban' }) %>" class="<%= view==='kanban'?'on':'' %>">Kanban</a><a href="<%= qs({ view: 'calendar' }) %>" class="<%= view==='calendar'?'on':'' %>">Calendar</a></div>
+<% const link = (t) => `/projects/${t.project_id}/tasks/${t.id}`; const late = (t) => t.status !== 'done' && t.due_date && t.due_date < today; %>
+<% if (view === 'list') { %>
+<div class="card tablewrap"><table><tr><th>Task</th><% if (locals.showProject) { %><th>Project</th><% } %><th>Assignee</th><th>Priority</th><th>Due</th><th>Progress</th><th>Status</th></tr>
+<% tasks.forEach(t => { %><tr><td><a href="<%= link(t) %>"><%= t.title %></a><% if (t.phase_name) { %><div class="muted small"><%= t.phase_name %></div><% } %><% if (t.depends_on) { %><div class="muted small">⛓ has dependency</div><% } %></td>
+<% if (locals.showProject) { %><td class="small"><%= t.code %> · <%= t.project_name %></td><% } %>
+<td><%= t.assignee || '—' %></td><td><%- badge(t.priority) %></td><td class="nowrap"><%= fmtDate(t.due_date) %> <% if (late(t)) { %><%- badge('overdue') %><% } %></td>
+<td style="min-width:90px"><div class="bar"><i style="width:<%= t.progress %>%"></i></div><span class="small muted"><%= t.progress %>%</span></td><td><%- badge(t.status) %></td></tr><% }) %>
+<% if (!tasks.length) { %><tr><td colspan="7" class="empty">No tasks.</td></tr><% } %></table></div>
+<% } else if (view === 'kanban') { %>
+<div class="kanban">
+<% Object.entries(C.TASK_STATUSES).forEach(([k, label]) => { const col = tasks.filter(t => t.status === k); %>
+  <div class="col" data-status="<%= k %>"><h3><%= label %> <span class="muted"><%= col.length %></span></h3>
+  <% col.forEach(t => { %><div class="kcard" draggable="true" data-url="<%= link(t) %>"><a href="<%= link(t) %>"><%= t.title %></a>
+    <div class="small muted"><%= t.assignee || 'Unassigned' %><% if (locals.showProject) { %> · <%= t.code %><% } %></div>
+    <div class="small"><%- badge(t.priority) %> <%= fmtDate(t.due_date) %> <% if (late(t)) { %><%- badge('overdue') %><% } %></div></div><% }) %>
+  </div>
+<% }) %>
+</div>
+<p class="muted small">Drag cards between columns to update status (assignee & manager are emailed).</p>
+<script>
+let drag;
+document.querySelectorAll('.kcard').forEach(c => { c.addEventListener('dragstart', () => { drag = c; c.classList.add('dragging'); }); c.addEventListener('dragend', () => c.classList.remove('dragging')); });
+document.querySelectorAll('.col').forEach(col => {
+  col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over'); });
+  col.addEventListener('dragleave', () => col.classList.remove('over'));
+  col.addEventListener('drop', async e => {
+    e.preventDefault(); col.classList.remove('over'); if (!drag) return;
+    const r = await fetch(drag.dataset.url, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ status: col.dataset.status }) });
+    if (r.ok) col.appendChild(drag); else { const j = await r.json().catch(() => ({})); alert((j.errors || ['Could not update task']).join('\n')); }
+  });
+});
+</script>
+<% } else { %>
+<div class="head"><a class="btn sm grey" href="<%= qs({ month: cal.prev }) %>">← Prev</a><h2 style="margin:0"><%= cal.label %></h2><a class="btn sm grey" href="<%= qs({ month: cal.next }) %>">Next →</a></div>
+<div class="cal">
+<% ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach(d => { %><div class="dow"><%= d %></div><% }) %>
+<% cal.days.forEach(d => { %><div class="<%= d.slice(0,7) !== cal.month ? 'out' : '' %> <%= d === today ? 'today' : '' %>"><b><%= Number(d.slice(8)) %></b>
+  <% tasks.filter(t => t.due_date === d).forEach(t => { %><a class="t <%= t.status === 'done' ? 'done' : late(t) ? 'late' : '' %>" href="<%= link(t) %>" title="<%= t.title %>"><%= t.title %></a><% }) %></div><% }) %>
+</div>
+<% } %>

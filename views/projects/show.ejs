@@ -1,0 +1,44 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<div class="grid g4">
+  <div class="kpi"><div class="l">Progress</div><div class="v"><%= prog.pct %>%</div><div class="bar"><i style="width:<%= prog.pct %>%"></i></div></div>
+  <div class="kpi"><div class="l">Active phase</div><div class="v" style="font-size:16px"><%= prog.active ? prog.active.name : (prog.allComplete ? 'All complete' : '—') %></div><% if (prog.active) { %><%- badge(prog.active.status) %><% } %></div>
+  <div class="kpi <%= overdue ? 'red' : '' %>"><div class="l">Tasks</div><div class="v"><%= prog.tasksDone %>/<%= prog.tasksTotal %></div><div class="muted small"><%= overdue %> overdue</div></div>
+  <% if (pay) { %><div class="kpi"><div class="l">Collected</div><div class="v"><%= money(pay.received) %></div><div class="muted small">of <%= money(pay.receivable) %> invoiced</div></div>
+  <% } else { %><div class="kpi"><div class="l">Documents</div><div class="v"><%= docsCount %></div></div><% } %>
+</div>
+<% if (prog.allComplete && project.status === 'active') { %><div class="flash success" style="margin-top:12px">All applicable phases are complete. <a href="/projects/<%= project.id %>/closure">Run the project closure checklist →</a></div><% } %>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h2>Upcoming tasks</h2>
+    <table><% upcoming.forEach(t => { %><tr><td><a href="/projects/<%= project.id %>/tasks/<%= t.id %>"><%= t.title %></a><div class="muted small"><%= t.assignee || 'Unassigned' %></div></td><td class="nowrap"><%= fmtDate(t.due_date) %><% if (t.due_date && t.due_date < U.today()) { %> <%- badge('overdue') %><% } %></td><td><%- badge(t.status) %></td></tr><% }) %></table>
+    <% if (!upcoming.length) { %><div class="empty">No open tasks.</div><% } %>
+    <p><a href="/projects/<%= project.id %>/tasks">All tasks →</a></p>
+  </div>
+  <div class="card"><h2>Phase tracker</h2>
+    <% prog.phases.forEach(ph => { %><div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--line)"><a href="/projects/<%= project.id %>/phases/<%= ph.id %>"><%= ph.seq %>. <%= ph.name %></a><%- badge(ph.status === 'na' ? 'cancelled' : ph.status, ph.status === 'na' ? 'N/A' : null) %></div><% }) %>
+  </div>
+  <div class="card"><h2>Open approvals</h2>
+    <% approvals.forEach(a => { %><div style="padding:4px 0"><a href="/projects/<%= project.id %>/approvals/<%= a.id %>"><%= a.title %></a> <%- badge(a.status) %></div><% }) %>
+    <% if (!approvals.length) { %><div class="muted">None pending.</div><% } %>
+    <% if (project.scope === 'design_construction') { %><h3>Construction</h3><div>Budget <%= money(project.construction_budget) %> · approved spend <%= money(spent) %></div><% } %>
+  </div>
+  <div class="card" id="team"><h2>Team</h2>
+    <% team.forEach(m => { %><div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--line)"><div><%= m.name %> <span class="muted small"><%= C.ROLES[m.role] || '' %><%= m.id === project.manager_id ? ' · Project manager' : '' %></span></div>
+      <% if (can('project_manage') && project.status === 'active' && m.id !== project.manager_id) { %><form method="post" action="/projects/<%= project.id %>/members"><input type="hidden" name="user_id" value="<%= m.id %>"><input type="hidden" name="action" value="remove"><button class="btn sm grey">Remove</button></form><% } %></div><% }) %>
+    <% if (can('project_manage') && project.status === 'active') { %><form method="post" action="/projects/<%= project.id %>/members" class="row" style="margin-top:8px"><select name="user_id"><% members.filter(m => !team.find(t => t.id === m.id)).forEach(m => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %></select><div style="flex:0"><button class="btn sm">Add</button></div></form><% } %>
+  </div>
+</div>
+<% if (can('project_manage') && project.status === 'active') { %>
+<details class="card"><summary>Edit project details</summary>
+<form method="post" action="/projects/<%= project.id %>/edit">
+  <div class="row"><div><label>Name</label><input name="name" value="<%= project.name %>"></div><div><label>Location</label><input name="location" value="<%= project.location || '' %>"></div></div>
+  <div class="row"><div><label>Client name</label><input name="client_name" value="<%= project.client_name || '' %>"></div><div><label>Client email</label><input type="email" name="client_email" value="<%= project.client_email || '' %>"></div><div><label>Client phone</label><input name="client_phone" value="<%= project.client_phone || '' %>"></div></div>
+  <div class="row"><div><label>Target end</label><input type="date" name="end_date" value="<%= project.end_date || '' %>"></div><div><label>Contract value</label><input type="number" step="any" name="contract_value" value="<%= project.contract_value || '' %>"></div>
+  <div><label>Project manager</label><select name="manager_id"><% members.forEach(m => { %><option value="<%= m.id %>" <%= m.id===project.manager_id?'selected':'' %>><%= m.name %></option><% }) %></select></div>
+  <% if (project.scope === 'design_construction') { %><div><label>Construction budget</label><input type="number" step="any" name="construction_budget" value="<%= project.construction_budget %>"></div><% } %></div>
+  <label>Description</label><textarea name="description"><%= project.description || '' %></textarea>
+  <p><button class="btn">Save</button></p>
+</form></details>
+<% } %>
+<div class="card small muted">Plot area <%= project.plot_area %> <%= C.AREA_UNITS[project.area_unit] || '' %><%= project.built_up_area ? ` · built-up ${project.built_up_area} ${C.AREA_UNITS[project.area_unit] || ''}` : '' %> · <%= fmtDate(project.start_date) %> → <%= fmtDate(project.end_date) %> · Manager: <%= manager ? manager.name : '—' %> · <%= project.location || '' %></div>
+<%- include('../partials/foot') %>

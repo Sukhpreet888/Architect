@@ -1,0 +1,8 @@
+<%- include('../partials/head') %>
+<div class="card">
+  <h2>Verify your email</h2>
+  <p>We emailed a verification link to <b><%= user.email %></b>. Click it to continue setting up your workspace.</p>
+  <form method="post" action="/verify/resend"><button class="btn ghost">Resend verification email</button></form>
+  <form method="post" action="/logout" style="margin-top:12px"><button class="btn sm grey">Use a different account</button></form>
+</div>
+<%- include('../partials/foot') %>

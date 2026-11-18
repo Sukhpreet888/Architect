@@ -1,0 +1,8 @@
+<%- include('../partials/head') %>
+<%- include('nav') %>
+<form class="row" style="max-width:640px;margin-bottom:12px">
+  <select name="status" onchange="this.form.submit()"><option value="">All statuses</option><% Object.entries(C.INVOICE_STATUSES).forEach(([k,v]) => { %><option value="<%= k %>" <%= status===k?'selected':'' %>><%= v %></option><% }) %></select>
+  <select name="project" onchange="this.form.submit()"><option value="">All projects</option><% projects.forEach(p => { %><option value="<%= p.id %>" <%= projectFilter===p.id?'selected':'' %>><%= p.code %> · <%= p.name %></option><% }) %></select>
+</form>
+<div class="card"><%- include('table', { invoices }) %></div>
+<%- include('../partials/foot') %>

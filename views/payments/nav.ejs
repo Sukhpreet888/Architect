@@ -1,0 +1,3 @@
+<div class="head"><div><h1>Payments <span class="muted" style="font-weight:400">— client receivables</span></h1></div>
+<% if (can('invoice_manage')) { %><a class="btn" href="/payments/invoices/new">+ Create invoice</a><% } %></div>
+<div class="tabs"><a href="/payments" class="<%= path === '/payments' ? 'on' : '' %>">Dashboard</a><a href="/payments/invoices" class="<%= path.startsWith('/payments/invoices') ? 'on' : '' %>">Invoices</a><a href="/payments/transactions" class="<%= path.startsWith('/payments/transactions') ? 'on' : '' %>">Transactions</a></div>

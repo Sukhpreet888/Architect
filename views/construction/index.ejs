@@ -1,0 +1,74 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const base = `/projects/${project.id}/construction`; const open = project.status === 'active'; const cm = open && can('construction_manage'); const budget = project.construction_budget; const util = budget ? Math.round(spent / budget * 100) : 0; %>
+<h2 id="cost">Construction cost management</h2>
+<div class="grid g4">
+  <div class="kpi"><div class="l">Budget</div><div class="v"><%= money(budget) %></div></div>
+  <div class="kpi <%= util >= 100 ? 'red' : util >= 80 ? 'amber' : 'green' %>"><div class="l">Approved spend</div><div class="v"><%= money(spent) %></div><div class="bar"><i style="width:<%= Math.min(util,100) %>%"></i></div><div class="small muted"><%= util %>% of budget</div></div>
+  <div class="kpi amber"><div class="l">Awaiting approval</div><div class="v"><%= money(pending) %></div></div>
+  <div class="kpi"><div class="l">Remaining</div><div class="v"><%= money(budget - spent) %></div></div>
+</div>
+<div class="grid g2" style="margin-top:16px">
+<div class="card"><h2>Budget vs actual</h2>
+  <table><tr><th>Category</th><th class="right">Approved</th><th class="right">Pending</th></tr>
+  <% byCat.forEach(c => { %><tr><td><%= C.EXPENSE_CATEGORIES[c.category] %></td><td class="right"><%= money(c.approved) %></td><td class="right"><%= money(c.pending) %></td></tr><% }) %>
+  <% if (!byCat.length) { %><tr><td colspan="3" class="empty">No expenditure yet.</td></tr><% } %></table>
+  <% if (open && can('project_manage')) { %><form method="post" action="<%= base %>/budget" class="row" style="align-items:flex-end;margin-top:10px"><div><label>Set construction budget</label><input type="number" step="any" min="0" name="budget" value="<%= budget %>"></div><div style="flex:0"><button class="btn sm">Save</button></div></form><% } %>
+</div>
+<% if (cm) { %><div class="card"><h2>Record expenditure</h2>
+<form method="post" action="<%= base %>/expenditures">
+  <div class="row"><div><label>Category</label><select name="category"><% Object.entries(C.EXPENSE_CATEGORIES).forEach(([k,v]) => { %><option value="<%= k %>"><%= v %></option><% }) %></select></div><div><label>Amount</label><input type="number" step="0.01" min="0.01" name="amount" required></div><div><label>Date</label><input type="date" name="spent_on" value="<%= U.today() %>"></div></div>
+  <div class="row"><div style="flex:2"><label>Description</label><input name="description" required></div><div><label>Vendor / contractor</label><input name="vendor"></div><div><label>Invoice ref</label><input name="invoice_ref"></div></div>
+  <p><button class="btn">Submit for approval</button></p>
+</form></div><% } %>
+</div>
+<div class="card tablewrap"><h2>Expenditure & invoice approvals</h2>
+<table><tr><th>Date</th><th>Category</th><th>Description</th><th>Vendor</th><th class="right">Amount</th><th>Status</th><th></th></tr>
+<% expenditures.forEach(e => { %><tr><td class="nowrap"><%= fmtDate(e.spent_on) %></td><td><%= C.EXPENSE_CATEGORIES[e.category] %></td><td><%= e.description %><div class="muted small"><%= e.invoice_ref || '' %> · by <%= e.creator %></div></td><td><%= e.vendor || '—' %></td><td class="right"><%= money(e.amount) %></td>
+<td><%- badge(e.status) %><% if (e.decider) { %><div class="muted small"><%= e.decider %></div><% } %></td>
+<td class="nowrap"><% if (open && e.status === 'pending' && can('expenditure_approve')) { %><form class="inline" method="post" action="<%= base %>/expenditures/<%= e.id %>"><button class="btn sm green" name="decision" value="approve">Approve</button> <button class="btn sm red" name="decision" value="reject">Reject</button></form><% } %></td></tr><% }) %>
+<% if (!expenditures.length) { %><tr><td colspan="7" class="empty">No expenditure recorded.</td></tr><% } %></table></div>
+
+<h2 id="materials" style="margin-top:24px">Materials & inventory</h2>
+<div class="card tablewrap"><table><tr><th>Material</th><th>Supplier</th><th class="right">Stock</th><th class="right">Reorder level</th><th></th><% if (cm) { %><th>Purchase / consume</th><% } %></tr>
+<% materials.forEach(m => { %><tr><td><b><%= m.name %></b></td><td><%= m.supplier || '—' %></td><td class="right"><%= m.stock %> <%= m.unit %></td><td class="right"><%= m.reorder_level %> <%= m.unit %></td><td><%- m.stock <= m.reorder_level ? badge('overdue', 'Reorder') : badge('active', 'OK') %></td>
+<% if (cm) { %><td><form method="post" action="<%= base %>/materials/<%= m.id %>/txn" class="row" style="gap:6px;flex-wrap:nowrap"><select name="kind" style="min-width:110px"><option value="purchase">Purchase</option><option value="consumption">Consume</option></select><input type="number" step="any" min="0" name="qty" placeholder="Qty" style="min-width:70px" required><input type="number" step="any" min="0" name="unit_cost" placeholder="Unit cost" style="min-width:90px"><input type="hidden" name="txn_date" value="<%= U.today() %>"><button class="btn sm" style="flex:0">Save</button></form></td><% } %></tr><% }) %>
+<% if (!materials.length) { %><tr><td colspan="6" class="empty">No materials tracked yet.</td></tr><% } %></table>
+<p class="muted small">Purchases with a unit cost automatically create a material expenditure for approval. Consumption reduces stock; falling to the reorder level emails an alert.</p></div>
+<% if (cm) { %><div class="grid g2">
+<div class="card"><h2>Add material</h2><form method="post" action="<%= base %>/materials">
+  <div class="row"><div style="flex:2"><label>Name</label><input name="name" required></div><div><label>Unit</label><input name="unit" value="bags"></div><div><label>Reorder level</label><input type="number" step="any" min="0" name="reorder_level" value="0"></div></div>
+  <label>Supplier</label><select name="supplier_id"><option value="">—</option><% suppliers.forEach(s => { %><option value="<%= s.id %>"><%= s.name %></option><% }) %></select>
+  <p><button class="btn sm">Add material</button></p></form></div>
+<div class="card"><h2>Suppliers</h2>
+  <% suppliers.forEach(s => { %><div class="small"><b><%= s.name %></b> <%= s.contact || '' %> <%= s.email || '' %> <%= s.phone || '' %></div><% }) %>
+  <form method="post" action="<%= base %>/suppliers" style="margin-top:8px"><div class="row"><input name="name" placeholder="Supplier name" required><input name="contact" placeholder="Contact person"></div><div class="row" style="margin-top:6px"><input type="email" name="email" placeholder="Email"><input name="phone" placeholder="Phone"></div><p><button class="btn sm">Add supplier</button></p></form></div>
+</div><% } %>
+<div class="card"><h2>Recent stock movements</h2><table class="small"><% txns.forEach(t => { %><tr><td><%= fmtDate(t.txn_date) %></td><td><%= t.material %></td><td><%- badge(t.kind === 'purchase' ? 'active' : 'pending', t.kind) %></td><td class="right"><%= t.qty %> <%= t.unit %></td><td class="right"><%= t.unit_cost ? money(t.unit_cost) + '/unit' : '' %></td><td><%= t.note || '' %></td></tr><% }) %>
+<% if (!txns.length) { %><tr><td class="empty">None.</td></tr><% } %></table></div>
+
+<h2 id="site" style="margin-top:24px">Site supervision</h2>
+<div class="grid g2">
+<div class="card"><h2>Site visits & inspection reports</h2>
+<% visits.forEach(v => { %><div style="padding:8px 0;border-bottom:1px solid var(--line)"><b><%= fmtDate(v.visit_date) %></b> — <%= v.purpose %> <%- badge(v.status) %><div class="muted small"><%= v.assignee || '' %></div>
+  <% if (v.report) { %><div class="small" style="white-space:pre-wrap"><%= v.report %></div><% } %>
+  <% if (cm && v.status === 'scheduled') { %><details><summary class="small">Record inspection report</summary><form method="post" action="<%= base %>/visits/<%= v.id %>"><textarea name="report" placeholder="Observations, progress, quality…" required></textarea><p><button class="btn sm">Complete visit</button></p></form>
+  <form method="post" action="<%= base %>/visits/<%= v.id %>"><input type="hidden" name="action" value="cancel"><button class="btn sm grey">Cancel visit</button></form></details><% } %></div><% }) %>
+<% if (!visits.length) { %><div class="muted">No visits scheduled.</div><% } %>
+<% if (cm) { %><h3>Schedule site visit</h3><form method="post" action="<%= base %>/visits"><div class="row"><div><label>Date</label><input type="date" name="visit_date" required></div><div><label>Inspector</label><select name="assigned_to"><% team.forEach(m => { %><option value="<%= m.id %>" <%= m.id===user.id?'selected':'' %>><%= m.name %></option><% }) %></select></div></div>
+<label>Purpose</label><input name="purpose" required><p><button class="btn sm">Schedule (email + day-before reminder)</button></p></form><% } %>
+</div>
+<div class="card"><h2>Observations & issues</h2>
+<% issues.forEach(i => { %><div style="padding:8px 0;border-bottom:1px solid var(--line)"><b><%= i.title %></b> <%- badge(i.severity) %> <%- badge(i.status) %>
+  <% if (i.description) { %><div class="small"><%= i.description %></div><% } %>
+  <% if (i.task_id) { %><div class="small">Rectification: <a href="/projects/<%= project.id %>/tasks/<%= i.task_id %>">task</a> → <%= i.assignee || '—' %> <%- badge(i.task_status) %></div><% } %>
+  <% if (cm && i.status !== 'resolved') { %><div class="row" style="margin-top:6px">
+    <% if (!i.task_id) { %><form method="post" action="<%= base %>/issues/<%= i.id %>" class="row" style="gap:6px"><input type="hidden" name="action" value="assign"><select name="assignee_id"><% team.forEach(m => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %></select><input type="date" name="due_date" required><button class="btn sm" style="flex:0">Assign rectification</button></form><% } %>
+    <form method="post" action="<%= base %>/issues/<%= i.id %>" style="flex:0"><input type="hidden" name="action" value="resolve"><button class="btn sm green">Resolve</button></form></div><% } %>
+</div><% }) %>
+<% if (!issues.length) { %><div class="muted">No issues logged.</div><% } %>
+<% if (cm) { %><h3>Log issue</h3><form method="post" action="<%= base %>/issues"><div class="row"><div style="flex:2"><label>Title</label><input name="title" required></div><div><label>Severity</label><select name="severity"><option>low</option><option selected>medium</option><option>high</option><option>critical</option></select></div></div>
+<label>From visit</label><select name="visit_id"><option value="">—</option><% visits.forEach(v => { %><option value="<%= v.id %>"><%= fmtDate(v.visit_date) %> — <%= v.purpose %></option><% }) %></select>
+<label>Description</label><textarea name="description" style="min-height:50px"></textarea><p><button class="btn sm">Log issue</button></p></form><% } %>
+</div></div>
+<%- include('../partials/foot') %>

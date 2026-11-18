@@ -1,0 +1,7 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Project templates</h1><p class="muted">Phases, subphases, tasks, deliverables and approvals used to generate a project's workflow. Saving creates a new version for future projects.</p></div>
+<% if (can('project_manage')) { %><a class="btn" href="/org/templates/new">+ New template</a><% } %></div>
+<div class="card"><table><tr><th>Template</th><th>Version</th><th>Status</th><th>Author</th><th>Saved</th><th></th></tr>
+<% templates.forEach(t => { %><tr><td><a href="/org/templates/<%= t.id %>"><%= t.name %></a></td><td>v<%= t.version %></td><td><%- t.is_current ? badge('active', 'Current') : badge('cancelled', 'Superseded') %></td><td><%= t.author || '—' %></td><td><%= fmtDate(t.created_at) %></td>
+<td class="right"><% if (can('project_manage')) { %><a class="btn sm ghost" href="/org/templates/new?from=<%= t.id %>">Duplicate</a><% } %></td></tr><% }) %></table></div>
+<%- include('../partials/foot') %>

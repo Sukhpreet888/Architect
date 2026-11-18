@@ -1,0 +1,11 @@
+<% if (org && user && user.email_verified) { %>
+    </div>
+  </div>
+</div>
+<% } else { %>
+</div>
+<% } %>
+<script>
+document.querySelectorAll('[data-confirm]').forEach(el => el.addEventListener('submit', e => { if (!confirm(el.dataset.confirm)) e.preventDefault(); }));
+</script>
+</body></html>

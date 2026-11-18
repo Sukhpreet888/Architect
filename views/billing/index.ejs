@@ -1,0 +1,52 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Billing & subscription</h1><p class="muted">Plan, usage, add-ons and payment method.</p></div>
+<a class="btn" href="/billing/plans">Upgrade / change plan</a></div>
+<div class="grid g4">
+  <div class="kpi"><div class="l">Plan</div><div class="v"><%= plan ? plan.name : 'Trial' %></div><div><%- badge(org.plan_status) %></div></div>
+  <% const pct = (a, b) => Math.min(100, Math.round(a / Math.max(b,1) * 100)); %>
+  <div class="kpi"><div class="l">Users</div><div class="v"><%= usage.users %> / <%= limits.users %></div><div class="bar"><i style="width:<%= pct(usage.users, limits.users) %>%"></i></div></div>
+  <div class="kpi"><div class="l">Active projects</div><div class="v"><%= usage.projects %> / <%= limits.projects %></div><div class="bar"><i style="width:<%= pct(usage.projects, limits.projects) %>%"></i></div></div>
+  <div class="kpi"><div class="l">Storage</div><div class="v"><%= fmtBytes(usage.storageBytes) %></div><div class="muted small">of <%= (limits.storageMb/1024).toFixed(0) %> GB</div><div class="bar"><i style="width:<%= pct(usage.storageBytes, limits.storageMb*1048576) %>%"></i></div></div>
+</div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card">
+    <h2>Subscription</h2>
+    <table>
+      <tr><td>Monthly total</td><td class="right"><b>$<%= monthly.toFixed(2) %></b></td></tr>
+      <tr><td>Status</td><td class="right"><%- badge(org.plan_status) %></td></tr>
+      <% if (org.plan_status === 'trial') { %><tr><td>Trial ends</td><td class="right"><%= fmtDate(org.trial_ends_at) %></td></tr><% } %>
+      <tr><td>Next billing date</td><td class="right"><%= fmtDate(org.next_billing_date) %></td></tr>
+      <tr><td>Add-ons</td><td class="right"><%= org.extra_users %> users · <%= org.extra_projects %> projects · <%= (org.extra_storage_mb/1024).toFixed(0) %> GB</td></tr>
+    </table>
+    <p class="muted small">Renewal notices, receipts and payment failures are sent by email to the billing email and admins.</p>
+    <% if (org.plan && org.plan_status !== 'cancelled') { %><form method="post" action="/billing/cancel" data-confirm="Cancel subscription? The workspace becomes read-only."><button class="btn sm red">Cancel subscription</button></form><% } %>
+  </div>
+  <div class="card">
+    <h2>Buy add-ons</h2>
+    <% addons.forEach(a => { %>
+    <form method="post" action="/billing/addon" class="row" style="align-items:flex-end;margin-bottom:8px">
+      <input type="hidden" name="addon" value="<%= a.key %>">
+      <div><b><%= a.name %></b><div class="muted small"><%= a.label %> · $<%= a.price %>/month each</div></div>
+      <div style="max-width:90px"><input type="number" name="qty" min="1" value="1"></div>
+      <div style="flex:0"><button class="btn sm">Buy</button></div>
+    </form>
+    <% }) %>
+  </div>
+  <div class="card">
+    <h2>Payment method</h2>
+    <p><%= org.card_last4 ? `${org.card_brand} •••• ${org.card_last4}` : 'No card on file' %> · billing email: <%= org.billing_email || '—' %></p>
+    <form method="post" action="/billing/payment-method">
+      <label>Card number</label><input name="card_number" inputmode="numeric">
+      <div class="row"><div><label>Expiry</label><input name="card_expiry" placeholder="MM/YY"></div><div><label>CVC</label><input name="card_cvc"></div></div>
+      <label>Billing email</label><input type="email" name="billing_email" value="<%= org.billing_email || '' %>">
+      <p><button class="btn">Update payment method</button></p>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Billing history</h2>
+    <div class="tablewrap"><table><tr><th>Date</th><th>Description</th><th class="right">Amount</th><th>Status</th></tr>
+    <% history.forEach(h => { %><tr><td class="nowrap"><%= fmtDate(h.created_at) %></td><td><%= h.description %></td><td class="right">$<%= Number(h.amount).toFixed(2) %></td><td><%- badge(h.status) %></td></tr><% }) %>
+    <% if (!history.length) { %><tr><td colspan="4" class="empty">No billing activity yet.</td></tr><% } %></table></div>
+  </div>
+</div>
+<%- include('../partials/foot') %>

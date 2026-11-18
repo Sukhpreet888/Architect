@@ -1,0 +1,12 @@
+<%- include('../partials/head') %>
+<h1>Approvals & reviews</h1>
+<div class="grid g2" style="margin-top:12px">
+<div class="card"><h2>Assigned to me as reviewer</h2>
+<table><% mine.forEach(a => { %><tr><td><a href="/projects/<%= a.project_id %>/approvals/<%= a.id %>"><%= a.title %></a><div class="muted small"><%= a.code %> · <%= a.project_name %> · round <%= a.round %></div></td>
+<td><%- a.status === 'pending' && !a.my_decision ? badge('pending', 'Your decision needed') : badge(a.my_decision || a.status) %></td></tr><% }) %>
+<% if (!mine.length) { %><tr><td class="empty">Nothing assigned.</td></tr><% } %></table></div>
+<div class="card"><h2>Requested by me</h2>
+<table><% requested.forEach(a => { %><tr><td><a href="/projects/<%= a.project_id %>/approvals/<%= a.id %>"><%= a.title %></a><div class="muted small"><%= a.code %> · <%= a.project_name %></div></td><td><%- badge(a.status) %></td></tr><% }) %>
+<% if (!requested.length) { %><tr><td class="empty">None.</td></tr><% } %></table></div>
+</div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<div class="card">
+  <h2>Create your organisation workspace</h2>
+  <p class="muted small">You will be the Organisation Admin. A 15-day free trial starts immediately.</p>
+  <form method="post" action="/onboarding/workspace">
+    <label>Organisation / practice name</label><input name="name" value="<%= form.name || '' %>" required>
+    <label>Phone</label><input name="phone" value="<%= form.phone || '' %>">
+    <label>Address</label><input name="address" value="<%= form.address || '' %>">
+    <div class="row">
+      <div><label>Currency</label><select name="currency"><% ['INR','USD','EUR','GBP','AED','SGD','AUD'].forEach(c => { %><option <%= (form.currency||'INR')===c?'selected':'' %>><%= c %></option><% }) %></select></div>
+      <div><label>Default area unit</label><select name="area_unit"><% Object.entries(C.AREA_UNITS).forEach(([k,v]) => { %><option value="<%= k %>"><%= v %></option><% }) %></select></div>
+    </div>
+    <label>Billing email</label><input type="email" name="billing_email" value="<%= form.billing_email || '' %>">
+    <p><button class="btn">Create workspace & start free trial</button></p>
+  </form>
+</div>
+<%- include('../partials/foot') %>

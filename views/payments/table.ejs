@@ -1,0 +1,4 @@
+<div class="tablewrap"><table><tr><th>Invoice</th><th>Project</th><th>Milestone</th><th>Due</th><th class="right">Total</th><th class="right">Paid</th><th class="right">Balance</th><th>Status</th></tr>
+<% invoices.forEach(i => { %><tr><td><a href="/payments/invoices/<%= i.id %>"><b><%= i.number %></b></a></td><td class="small"><%= i.code %> · <%= i.project_name %></td><td><%= i.milestone %></td><td class="nowrap"><%= fmtDate(i.due_date) %></td>
+<td class="right"><%= money(i.total) %></td><td class="right"><%= money(i.paid) %></td><td class="right"><b><%= money(i.balance) %></b></td><td><%- badge(i.status) %></td></tr><% }) %>
+<% if (!invoices.length) { %><tr><td colspan="8" class="empty">No invoices.</td></tr><% } %></table></div>

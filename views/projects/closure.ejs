@@ -1,0 +1,26 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% if (project.status === 'closed') { %>
+  <div class="flash success">Project completed on <%= fmtDate(project.closed_at) %> and archived.</div>
+  <div class="card report"><h2>Closure report</h2><%- project.closure_report %></div>
+  <p><a class="btn ghost" href="/reports/projects/<%= project.id %>?format=pdf">Download PDF</a> <a class="btn ghost" href="/reports/projects/<%= project.id %>?format=xlsx">Download Excel</a></p>
+<% } else { %>
+<div class="grid g2">
+<div class="card"><h2>Project closure checklist</h2>
+  <ul class="check"><% check.items.forEach(i => { %><li><span><span class="<%= i.ok ? 'ok' : 'no' %>"><%= i.ok ? '✓' : '✗' %></span> <%= i.label %></span><span class="muted small"><%= i.detail %></span></li><% }) %></ul>
+  <% if (check.complete) { %>
+    <% if (can('project_close')) { %><form method="post" action="/projects/<%= project.id %>/closure" data-confirm="Close and archive this project? It becomes read-only." style="margin-top:12px">
+      <label>Closing notes</label><textarea name="notes" style="min-height:60px"></textarea>
+      <p><button class="btn green">Close project, generate closure report & archive</button></p></form>
+    <% } else { %><p class="muted">Checklist complete — an Admin or Project Manager can close the project.</p><% } %>
+  <% } else { %><p class="muted" style="margin-top:12px">Complete the pending items to close the project.</p><% } %>
+</div>
+<div class="card"><h2>Complete pending items</h2>
+  <% if (pending.tasks.length) { %><h3>Tasks (<%= pending.tasks.length %>)</h3><% pending.tasks.slice(0,10).forEach(t => { %><div class="small"><a href="/projects/<%= project.id %>/tasks/<%= t.id %>"><%= t.title %></a> · <%= t.assignee || 'unassigned' %> · <%- badge(t.status) %></div><% }) %><% } %>
+  <% if (pending.deliverables.length) { %><h3>Deliverables (<%= pending.deliverables.length %>)</h3><% pending.deliverables.forEach(d => { %><div class="small"><a href="/projects/<%= project.id %>/phases/<%= d.phase_id %>"><%= d.name %></a> <%- badge(d.status) %></div><% }) %><% } %>
+  <% if (pending.approvals.length) { %><h3>Approvals (<%= pending.approvals.length %>)</h3><% pending.approvals.forEach(a => { %><div class="small"><a href="/projects/<%= project.id %>/approvals/<%= a.id %>"><%= a.title %></a> <%- badge(a.status) %></div><% }) %><% } %>
+  <% if (pending.invoices.length) { %><h3>Payments (<%= pending.invoices.length %>)</h3><% pending.invoices.forEach(i => { %><div class="small"><a href="/payments/invoices/<%= i.id %>"><%= i.number %></a> balance <%= money(i.balance) %> <%- badge(i.status) %></div><% }) %><% } %>
+  <% if (!pending.tasks.length && !pending.deliverables.length && !pending.approvals.length && !pending.invoices.length) { %><div class="muted">Nothing pending.</div><% } %>
+</div></div>
+<% } %>
+<%- include('../partials/foot') %>

@@ -1,0 +1,38 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const open = project.status === 'active' && can('task_manage'); const url = `/projects/${project.id}/tasks/${task.id}`; %>
+<div class="grid g2">
+<div class="card">
+  <h2><%= task.title %> <%- badge(task.status) %></h2>
+  <p class="muted"><%= task.description || 'No description.' %></p>
+  <table class="small"><tr><td>Assignee</td><td><%= assignee ? assignee.name : 'Unassigned' %></td></tr><tr><td>Priority</td><td><%- badge(task.priority) %></td></tr>
+  <tr><td>Dates</td><td><%= fmtDate(task.start_date) %> → <%= fmtDate(task.due_date) %> <% if (task.status !== 'done' && task.due_date && task.due_date < U.today()) { %><%- badge('overdue') %><% } %></td></tr>
+  <tr><td>Progress</td><td><div class="bar"><i style="width:<%= task.progress %>%"></i></div><%= task.progress %>%</td></tr>
+  <tr><td>Depends on</td><td><%- dep ? `<a href="/projects/${project.id}/tasks/${dep.id}">${esc(dep.title)}</a> ${badge(dep.status)}` : '—' %></td></tr>
+  <tr><td>Blocking</td><td><%- blocking.length ? blocking.map(b => `<a href="/projects/${project.id}/tasks/${b.id}">${esc(b.title)}</a>`).join(', ') : '—' %></td></tr>
+  <tr><td>Documents</td><td><%- documents.length ? documents.map(d => `<a href="/projects/${project.id}/documents/${d.id}">${esc(d.title)}</a>`).join(', ') : '—' %></td></tr></table>
+  <% if (open) { %>
+  <h3>Track progress</h3>
+  <form method="post" action="<%= url %>" class="row" style="align-items:flex-end">
+    <div><label>Status</label><select name="status"><% Object.entries(C.TASK_STATUSES).forEach(([k,v]) => { %><option value="<%= k %>" <%= task.status===k?'selected':'' %>><%= v %></option><% }) %></select></div>
+    <div><label>Progress %</label><input type="number" name="progress" min="0" max="100" value="<%= task.progress %>"></div>
+    <div style="flex:0"><button class="btn">Update</button></div>
+  </form><% } %>
+</div>
+<% if (open) { %>
+<div class="card"><h2>Edit / re-assign</h2>
+<form method="post" action="<%= url %>">
+  <label>Title</label><input name="title" value="<%= task.title %>">
+  <div class="row"><div><label>Assignee</label><select name="assignee_id"><option value="">Unassigned</option><% team.forEach(m => { %><option value="<%= m.id %>" <%= m.id===task.assignee_id?'selected':'' %>><%= m.name %></option><% }) %></select></div>
+  <div><label>Priority</label><select name="priority"><% Object.entries(C.PRIORITIES).forEach(([k,v]) => { %><option value="<%= k %>" <%= task.priority===k?'selected':'' %>><%= v %></option><% }) %></select></div></div>
+  <div class="row"><div><label>Start</label><input type="date" name="start_date" value="<%= task.start_date || '' %>"></div><div><label>Due</label><input type="date" name="due_date" value="<%= task.due_date || '' %>"></div></div>
+  <div class="row"><div><label>Phase</label><select name="phase_id"><option value="">—</option><% phases.forEach(p => { %><option value="<%= p.id %>" <%= p.id===task.phase_id?'selected':'' %>><%= p.name %></option><% }) %></select></div>
+  <div><label>Depends on</label><select name="depends_on"><option value="">No dependency</option><% otherTasks.forEach(t => { %><option value="<%= t.id %>" <%= t.id===task.depends_on?'selected':'' %>><%= t.title %></option><% }) %></select></div></div>
+  <label>Deliverable</label><select name="deliverable_id"><option value="">—</option><% deliverables.forEach(d => { %><option value="<%= d.id %>" <%= d.id===task.deliverable_id?'selected':'' %>><%= d.name %></option><% }) %></select>
+  <label>Description</label><textarea name="description"><%= task.description || '' %></textarea>
+  <p><button class="btn">Save</button></p>
+</form>
+<form method="post" action="<%= url %>" data-confirm="Delete this task?"><input type="hidden" name="action" value="delete"><button class="btn sm red">Delete task</button></form>
+</div><% } %>
+</div>
+<%- include('../partials/foot') %>

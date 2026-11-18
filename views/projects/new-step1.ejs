@@ -1,0 +1,24 @@
+<%- include('../partials/head') %>
+<h1>Create new project</h1><p class="muted"><b>Step 1 of 2:</b> Project classification</p>
+<div class="card" style="max-width:820px">
+<form method="post" action="/projects/new/step1">
+  <label>Main project type</label>
+  <div class="grid g4">
+  <% Object.entries(C.PROJECT_TYPES).forEach(([k, t]) => { %>
+    <div class="card" style="margin:0;padding:12px"><label style="margin:0"><input type="radio" name="type" value="<%= k %>" <%= draft.type===k?'checked':'' %> required> <%= t.name %></label>
+      <% t.subtypes.forEach(s => { %><label class="small" style="font-weight:400;margin:6px 0 0 18px"><input type="radio" name="subtype" value="<%= s %>" data-type="<%= k %>" <%= draft.subtype===s?'checked':'' %>> <%= s %></label><% }) %>
+    </div>
+  <% }) %>
+  </div>
+  <div class="row">
+    <div><label>Plot area</label><input type="number" step="any" min="0" name="plot_area" value="<%= draft.plot_area || '' %>" required></div>
+    <div><label>Built-up area</label><input type="number" step="any" min="0" name="built_up_area" value="<%= draft.built_up_area || '' %>"></div>
+    <div><label>Area unit</label><select name="area_unit"><% Object.entries(C.AREA_UNITS).forEach(([k,v]) => { %><option value="<%= k %>" <%= draft.area_unit===k?'selected':'' %>><%= v %></option><% }) %></select></div>
+  </div>
+  <p><button class="btn">Continue to Step 2 →</button></p>
+</form></div>
+<script>
+document.querySelectorAll('input[name=subtype]').forEach(r => r.addEventListener('change', () => { document.querySelector(`input[name=type][value="${r.dataset.type}"]`).checked = true; }));
+document.querySelectorAll('input[name=type]').forEach(r => r.addEventListener('change', () => { const s = document.querySelector('input[name=subtype]:checked'); if (s && s.dataset.type !== r.value) s.checked = false; }));
+</script>
+<%- include('../partials/foot') %>

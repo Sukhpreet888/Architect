@@ -1,0 +1,8 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Email log</h1><p class="muted">Every notification and reminder ARCHFLOW sends — email is the only channel. <%= C.config.mail.host ? 'Delivered via SMTP.' : 'SMTP is not configured: emails are recorded here but not delivered.' %></p></div>
+<form method="post" action="/org/reminders/run"><button class="btn ghost">Run reminder check now</button></form></div>
+<div class="seg" style="margin-bottom:12px"><a href="/org/emails" class="<%= !cat ? 'on' : '' %>">All</a><% ['reminder','invoice','task','approval','project','document','construction','team','billing'].forEach(c => { %><a href="?category=<%= c %>" class="<%= cat===c?'on':'' %>"><%= c %></a><% }) %></div>
+<div class="card tablewrap"><table><tr><th>When</th><th>To</th><th>Subject</th><th>Type</th><th>Status</th></tr>
+<% rows.forEach(r => { %><tr><td class="nowrap small"><%= r.created_at %></td><td><%= r.to_email %></td><td><a href="/org/emails/<%= r.id %>" target="_blank"><%= r.subject %></a><% if (r.error) { %><div class="small" style="color:var(--red)"><%= r.error %></div><% } %></td><td><%= r.category %></td><td><%- badge(r.status) %></td></tr><% }) %>
+<% if (!rows.length) { %><tr><td colspan="5" class="empty">No emails yet.</td></tr><% } %></table></div>
+<%- include('../partials/foot') %>

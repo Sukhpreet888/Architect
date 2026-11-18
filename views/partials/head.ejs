@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title><%= title %> · ARCHFLOW</title><link rel="stylesheet" href="/static/style.css"></head>
+<body>
+<% if (org && user && user.email_verified) { const nav = (href, label, show = true) => show ? `<a href="${href}" class="${path === href || (href !== '/dashboard' && path.startsWith(href)) ? 'on' : ''}">${label}</a>` : ''; %>
+<div class="app">
+  <aside class="side">
+    <div class="brand">ARCHFLOW<small><%= org.name %></small></div>
+    <nav>
+      <%- nav('/dashboard', 'Dashboard') %>
+      <div class="sec">Work</div>
+      <%- nav('/projects', 'Projects') %>
+      <%- nav('/tasks', 'Task management') %>
+      <%- nav('/approvals', 'Approvals & reviews') %>
+      <%- nav('/payments', 'Payments', can('payments_view')) %>
+      <%- nav('/reports', 'Reports & analytics', can('reports_view')) %>
+      <div class="sec">Organisation</div>
+      <%- nav('/org/settings', 'Organisation setup', can('org_manage')) %>
+      <%- nav('/org/team', 'Team & roles') %>
+      <%- nav('/org/templates', 'Project templates') %>
+      <%- nav('/org/emails', 'Email log', can('org_manage')) %>
+      <%- nav('/billing', 'Billing & subscription', can('billing')) %>
+    </nav>
+    <div class="me">
+      <div><b><%= user.name %></b></div><div class="muted" style="color:#8ea3c4"><%= C.ROLES[role] %></div>
+      <% if (locals.orgs && orgs.length > 1) { %>
+      <form method="post" action="/switch-org" style="margin-top:6px"><select name="org_id" onchange="this.form.submit()"><% orgs.forEach(o => { %><option value="<%= o.id %>" <%= o.id === org.id ? 'selected' : '' %>><%= o.name %></option><% }) %></select></form>
+      <% } %>
+      <form method="post" action="/logout" style="margin-top:8px"><button class="btn sm grey">Sign out</button></form>
+    </div>
+  </aside>
+  <div class="main">
+    <% if (sub && sub.expired) { %><div class="banner red">Your subscription is inactive — the workspace is read-only. <% if (can('billing')) { %><a href="/billing/plans">Choose a plan</a><% } else { %>Ask your admin to choose a plan.<% } %></div>
+    <% } else if (sub && sub.onTrial) { %><div class="banner">Free trial: <b><%= sub.trialDaysLeft %> day<%= sub.trialDaysLeft === 1 ? '' : 's' %></b> left<% if (org.plan) { %> on the <b><%= C.PLANS[org.plan].name %></b> plan — billing starts <%= fmtDate(org.trial_ends_at) %><% } %>. <% if (can('billing') && !org.plan) { %><a href="/onboarding/plan">Select a plan</a><% } %></div><% } %>
+    <div class="content">
+<% } else { %>
+<div class="auth">
+  <div class="brand">ARCHFLOW</div>
+<% } %>
+<% flash.forEach(f => { %><div class="flash <%= f.type %>"><%= f.msg %></div><% }) %>
+<% if (locals.errors && errors.length) { %><div class="errors"><ul><% errors.forEach(e => { %><li><%= e %></li><% }) %></ul></div><% } %>

@@ -1,0 +1,12 @@
+<%- include('../partials/head') %>
+<div class="card">
+  <h2>Create your account</h2>
+  <form method="post" action="/register">
+    <label>Full name</label><input name="name" value="<%= form.name || '' %>" required>
+    <label>Work email</label><input type="email" name="email" value="<%= form.email || '' %>" required>
+    <label>Password <span class="muted">(min 8 characters)</span></label><input type="password" name="password" minlength="8" required>
+    <p><button class="btn" style="width:100%;justify-content:center">Register</button></p>
+  </form>
+  <p class="muted small">Already registered? <a href="/login">Sign in</a></p>
+</div>
+<%- include('../partials/foot') %>

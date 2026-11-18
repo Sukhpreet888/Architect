@@ -1,0 +1,46 @@
+<%- include('../partials/head') %>
+<%- include('nav') %>
+<% const act = (a, label, cls = 'grey', extra = '') => `<form class="inline" method="post" action="/payments/invoices/${inv.id}/status"><input type="hidden" name="action" value="${a}"><button class="btn sm ${cls}" ${extra}>${label}</button></form>`; const manage = can('invoice_manage') && project.status === 'active'; %>
+<div class="grid g2">
+<div class="card">
+  <h2>Invoice <%= inv.number %> <%- badge(inv.status) %></h2>
+  <table><tr><td>Project</td><td><a href="/projects/<%= project.id %>"><%= project.code %> · <%= project.name %></a></td></tr>
+  <tr><td>Client</td><td><%= project.client_name || '—' %> &lt;<%= project.client_email || 'no email' %>&gt;</td></tr>
+  <tr><td>Milestone</td><td><%= inv.milestone %></td></tr><tr><td>Issue / due</td><td><%= fmtDate(inv.issue_date) %> → <b><%= fmtDate(inv.due_date) %></b></td></tr>
+  <tr><td>Amount</td><td><%= money(inv.amount) %> + tax <%= money(inv.tax) %> = <b><%= money(totals.total) %></b></td></tr>
+  <tr><td>Paid</td><td><%= money(totals.paid) %></td></tr><tr><td>Balance due</td><td><b><%= money(totals.balance) %></b></td></tr></table>
+  <% if (inv.notes) { %><p class="small muted"><%= inv.notes %></p><% } %>
+  <% if (manage) { %><p>
+    <% if (inv.status === 'draft') { %><%- act('issue', 'Issue & email', 'green') %> <%- act('delete', 'Delete draft', 'red') %><% } %>
+    <% if (['issued','partial','overdue'].includes(inv.status)) { %><%- act('resend', 'Re-send by email') %> <%- act('dispute', 'Mark disputed') %><% } %>
+    <% if (inv.status === 'disputed') { %><%- act('resolve', 'Resolve dispute') %><% } %>
+  </p>
+  <% if (['issued','partial','overdue'].includes(inv.status)) { %><form method="post" action="/payments/invoices/<%= inv.id %>/status" class="row" style="align-items:flex-end;max-width:420px"><input type="hidden" name="action" value="due_date"><div><label>Change due date</label><input type="date" name="due_date" value="<%= inv.due_date %>"></div><div style="flex:0"><button class="btn sm grey">Update</button></div></form><% } %>
+  <% if (inv.status === 'draft') { %><details><summary>Edit draft</summary><form method="post" action="/payments/invoices/<%= inv.id %>/status"><input type="hidden" name="action" value="update">
+    <label>Milestone</label><input name="milestone" value="<%= inv.milestone %>"><div class="row"><div><label>Amount</label><input type="number" step="0.01" name="amount" value="<%= inv.amount %>"></div><div><label>Tax</label><input type="number" step="0.01" name="tax" value="<%= inv.tax %>"></div><div><label>Due</label><input type="date" name="due_date" value="<%= inv.due_date %>"></div></div>
+    <label>Notes</label><textarea name="notes"><%= inv.notes || '' %></textarea><p><button class="btn sm">Save</button></p></form></details><% } %>
+  <% } %>
+</div>
+<div>
+  <% if (can('invoice_manage') && ['issued','partial','overdue','disputed'].includes(inv.status)) { %>
+  <div class="card"><h2>Record payment</h2>
+  <form method="post" action="/payments/transactions" enctype="multipart/form-data">
+    <input type="hidden" name="invoice_id" value="<%= inv.id %>">
+    <div class="row"><div><label>Amount</label><input type="number" step="0.01" min="0.01" max="<%= totals.balance %>" name="amount" value="<%= totals.balance %>" required></div><div><label>Date</label><input type="date" name="paid_on" value="<%= U.today() %>"></div></div>
+    <div class="row"><div><label>Method</label><select name="method"><% Object.entries(C.PAYMENT_METHODS).forEach(([k,v]) => { %><option value="<%= k %>"><%= v %></option><% }) %></select></div><div><label>Reference</label><input name="reference" placeholder="UTR / cheque no."></div></div>
+    <label>Proof <span class="muted">(PDF / image)</span></label><input type="file" name="proof">
+    <% if (inv.status === 'disputed') { %><label style="font-weight:400"><input type="checkbox" name="resolve_dispute" value="1" checked> Resolve dispute</label><% } %>
+    <p><button class="btn green">Record payment</button></p>
+  </form></div><% } %>
+  <div class="card"><h2>Email reminder schedule</h2>
+    <table class="small"><% schedule.forEach(r => { %><tr><td><%= r.label %></td><td><%= fmtDate(r.date) %></td><td><%- r.sent ? badge('sent') : (['paid','disputed','draft'].includes(inv.status) ? badge('cancelled', inv.status === 'draft' ? 'Not issued' : 'Stopped') : badge('scheduled')) %></td></tr><% }) %></table>
+  </div>
+</div></div>
+<div class="grid g2">
+<div class="card"><h2>Payments</h2><table><tr><th>Date</th><th>Method</th><th>Reference</th><th class="right">Amount</th><th>Proof</th></tr>
+<% payments.forEach(p => { %><tr><td><%= fmtDate(p.paid_on) %></td><td><%= C.PAYMENT_METHODS[p.method] %></td><td><%= p.reference || '—' %></td><td class="right"><%= money(p.amount) %></td><td><%- p.proof_name ? `<a href="/payments/transactions/${p.id}/proof">Download</a>` : '—' %></td></tr><% }) %>
+<% if (!payments.length) { %><tr><td colspan="5" class="empty">No payments recorded.</td></tr><% } %></table></div>
+<div class="card"><h2>Emails sent</h2><table class="small"><% emails.forEach(e => { %><tr><td class="nowrap"><%= e.created_at %></td><td><%= e.to_email %></td><td><%= e.subject %></td></tr><% }) %>
+<% if (!emails.length) { %><tr><td class="empty">None yet.</td></tr><% } %></table></div>
+</div>
+<%- include('../partials/foot') %>

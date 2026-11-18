@@ -1,0 +1,29 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const base = `/projects/${project.id}/documents/${doc.id}`; const open = project.status === 'active' && can('doc_upload'); %>
+<div class="grid g2">
+<div class="card"><h2><%= doc.title %> <% if (doc.restricted) { %><span class="badge b-amber">Restricted</span><% } %></h2>
+  <h3>Version history <span class="muted small">(previous revisions are never overwritten)</span></h3>
+  <table><tr><th>Rev</th><th>File</th><th>Notes</th><th>By</th><th>Date</th><th></th></tr>
+  <% versions.forEach((v, i) => { %><tr><td><span class="badge <%= i === 0 ? 'b-blue' : '' %>">R<%= v.version %></span></td><td class="small"><%= v.original_name %><div class="muted"><%= fmtBytes(v.size) %></div></td><td class="small"><%= v.notes || '' %></td><td class="small"><%= v.uploader %></td><td class="small nowrap"><%= fmtDate(v.created_at) %></td>
+  <td><a class="btn sm ghost" href="<%= base %>/versions/<%= v.id %>/download">Download</a></td></tr><% }) %></table>
+  <% if (open) { %>
+  <h3>Upload new revision</h3>
+  <form method="post" action="<%= base %>/versions" enctype="multipart/form-data"><input type="file" name="file" required><label>Revision notes</label><input name="notes" placeholder="What changed?"><p><button class="btn">Upload revision <%= versions[0].version + 1 %></button></p></form>
+  <% } %>
+  <% if (approvals.length) { %><h3>Approvals</h3><% approvals.forEach(a => { %><div><a href="/projects/<%= project.id %>/approvals/<%= a.id %>"><%= a.title %></a> <%- badge(a.status) %></div><% }) %><% } %>
+</div>
+<div class="card"><h2>Details & links</h2>
+<form method="post" action="<%= base %>/link">
+  <label>Title</label><input name="title" value="<%= doc.title %>" <%= open ? '' : 'disabled' %>>
+  <label>Phase</label><select name="phase_id" <%= open ? '' : 'disabled' %>><option value="">—</option><% phases.forEach(p => { %><option value="<%= p.id %>" <%= p.id===doc.phase_id?'selected':'' %>><%= p.seq %>. <%= p.name %></option><% }) %></select>
+  <label>Category</label><input name="category" value="<%= doc.category || '' %>" <%= open ? '' : 'disabled' %>>
+  <label>Linked task</label><select name="task_id" <%= open ? '' : 'disabled' %>><option value="">—</option><% tasks.forEach(t => { %><option value="<%= t.id %>" <%= t.id===doc.task_id?'selected':'' %>><%= t.title %></option><% }) %></select>
+  <label>Linked deliverable</label><select name="deliverable_id" <%= open ? '' : 'disabled' %>><option value="">—</option><% deliverables.forEach(d => { %><option value="<%= d.id %>" <%= d.id===doc.deliverable_id?'selected':'' %>><%= d.name %></option><% }) %></select>
+  <% if (can('doc_restricted')) { %><label style="font-weight:400"><input type="checkbox" name="restricted" value="1" <%= doc.restricted ? 'checked' : '' %> <%= open ? '' : 'disabled' %>> Restricted access</label><% } %>
+  <% if (open) { %><p><button class="btn">Save links</button></p><% } %>
+</form>
+<% if (open) { %><p><a class="btn sm ghost" href="/projects/<%= project.id %>/approvals?document=<%= doc.id %>">Request approval for this document</a></p><% } %>
+<% if (project.status === 'active' && can('project_manage')) { %><form method="post" action="<%= base %>/delete" data-confirm="Delete this document and all revisions?"><button class="btn sm red">Delete document</button></form><% } %>
+</div></div>
+<%- include('../partials/foot') %>

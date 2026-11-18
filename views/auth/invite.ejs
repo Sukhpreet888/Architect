@@ -1,0 +1,15 @@
+<%- include('../partials/head') %>
+<div class="card">
+  <h2>Join <%= invite.org_name %></h2>
+  <p class="muted">You were invited as <b><%= C.ROLES[invite.role] %></b> (<%= invite.email %>).</p>
+  <form method="post" action="/invite/<%= invite.token %>">
+    <% if (existing) { %>
+      <label>Your ARCHFLOW password</label><input type="password" name="password" required>
+    <% } else { %>
+      <label>Full name</label><input name="name" value="<%= invite.name || '' %>" required>
+      <label>Choose a password</label><input type="password" name="password" minlength="8" required>
+    <% } %>
+    <p><button class="btn">Accept invitation</button></p>
+  </form>
+</div>
+<%- include('../partials/foot') %>

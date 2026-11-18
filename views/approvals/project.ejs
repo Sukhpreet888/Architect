@@ -1,0 +1,20 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% if (project.status === 'active' && can('approval_create')) { %>
+<details class="card" <%= query.document ? 'open' : '' %>><summary>+ Create approval request</summary>
+<form method="post" action="/projects/<%= project.id %>/approvals">
+  <div class="row"><div style="flex:2"><label>Title</label><input name="title" required placeholder="e.g. Facade material approval"></div>
+  <div><label>Type</label><select name="type"><% Object.entries(C.APPROVAL_TYPES).filter(([k]) => k !== 'phase').forEach(([k,v]) => { %><option value="<%= k %>"><%= v %></option><% }) %></select></div></div>
+  <div class="row">
+    <div><label>Phase</label><select name="phase_id"><option value="">—</option><% phases.forEach(p => { %><option value="<%= p.id %>"><%= p.seq %>. <%= p.name %></option><% }) %></select></div>
+    <div><label>Deliverable</label><select name="deliverable_id"><option value="">—</option><% deliverables.forEach(d => { %><option value="<%= d.id %>"><%= d.name %> (<%= d.status %>)</option><% }) %></select></div>
+    <div><label>Document</label><select name="document_id"><option value="">—</option><% documents.forEach(d => { %><option value="<%= d.id %>" <%= String(query.document)===String(d.id)?'selected':'' %>><%= d.title %></option><% }) %></select></div>
+  </div>
+  <label>Assign reviewer(s)</label><div class="row"><% team.forEach(m => { %><label style="font-weight:400;flex:0 0 auto"><input type="checkbox" name="reviewers" value="<%= m.id %>"> <%= m.name %> <span class="muted small"><%= C.ROLES[m.role] || '' %></span></label><% }) %></div>
+  <label>Description</label><textarea name="description" style="min-height:50px"></textarea>
+  <p><button class="btn">Send for review</button> <span class="muted small">Reviewers are notified by email and reminded after 3 and 7 days.</span></p>
+</form></details><% } %>
+<div class="card tablewrap"><table><tr><th>Request</th><th>Type</th><th>Phase</th><th>Requested by</th><th>Decisions</th><th>Status</th></tr>
+<% approvals.forEach(a => { %><tr><td><a href="/projects/<%= project.id %>/approvals/<%= a.id %>"><%= a.title %></a><div class="muted small">round <%= a.round %></div></td><td><%= C.APPROVAL_TYPES[a.type] %></td><td class="small"><%= a.phase_name || '—' %></td><td><%= a.requester || '—' %></td><td><%= a.decided %>/<%= a.reviewers %></td><td><%- badge(a.status, a.status === 'draft' ? 'Not requested' : null) %></td></tr><% }) %>
+<% if (!approvals.length) { %><tr><td colspan="6" class="empty">No approvals.</td></tr><% } %></table></div>
+<%- include('../partials/foot') %>

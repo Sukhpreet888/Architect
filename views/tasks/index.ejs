@@ -1,0 +1,5 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Task management</h1><p class="muted">Tasks across your active projects.</p></div>
+<div class="seg"><a href="?scope=mine&view=<%= view %>" class="<%= scope==='mine'?'on':'' %>">Assigned to me</a><a href="?scope=all&view=<%= view %>" class="<%= scope==='all'?'on':'' %>">All tasks</a></div></div>
+<%- include('../partials/tasks-views', { showProject: true }) %>
+<%- include('../partials/foot') %>

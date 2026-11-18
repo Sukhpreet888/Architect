@@ -1,0 +1,44 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% const base = `/projects/${project.id}/approvals/${ap.id}`; const open = project.status === 'active'; %>
+<div class="grid g2">
+<div class="card">
+  <h2><%= ap.title %> <%- badge(ap.status, ap.status === 'draft' ? 'Not requested' : null) %></h2>
+  <table class="small"><tr><td>Type</td><td><%= C.APPROVAL_TYPES[ap.type] %></td></tr><tr><td>Round</td><td><%= ap.round %></td></tr>
+  <tr><td>Requested by</td><td><%= requester ? requester.name : '—' %> <%= ap.requested_at ? '· ' + fmtDate(ap.requested_at) : '' %></td></tr>
+  <tr><td>Phase</td><td><%- phase ? `<a href="/projects/${project.id}/phases/${phase.id}">${esc(phase.name)}</a>` : '—' %></td></tr>
+  <tr><td>Deliverable</td><td><%- deliverable ? `${esc(deliverable.name)} ${badge(deliverable.status)}` : '—' %></td></tr>
+  <tr><td>Document</td><td><%- document ? `<a href="/projects/${project.id}/documents/${document.id}">${esc(document.title)}</a>` : '—' %></td></tr></table>
+  <% if (ap.description) { %><p><%= ap.description %></p><% } %>
+  <h3>Reviewers</h3>
+  <table><% reviewers.forEach(r => { %><tr><td><%= r.name %></td><td><%- r.decision ? badge(r.decision) : badge('pending', 'Awaiting') %></td><td class="small"><%= r.comment || '' %></td></tr><% }) %></table>
+
+  <% if (open && me && !me.decision && ap.status === 'pending') { %>
+  <h3>Your review & decision</h3>
+  <form method="post" action="<%= base %>/decide">
+    <div class="row"><% Object.entries(C.DECISIONS).forEach(([k,v]) => { %><label style="font-weight:400;flex:0 0 auto"><input type="radio" name="decision" value="<%= k %>" required> <%= v %></label><% }) %></div>
+    <label>Comments <span class="muted">(required for revision / rejection)</span></label><textarea name="comment"></textarea>
+    <p><button class="btn">Record decision</button></p>
+  </form><% } %>
+</div>
+<div>
+  <% if (open && can('approval_create') && ['draft','revision_required','rejected'].includes(ap.status)) { %>
+  <div class="card" style="border-color:#f1c27a"><h2><%= ap.status === 'draft' ? 'Send request' : 'Revise & re-submit' %></h2>
+  <form method="post" action="<%= base %>/submit">
+    <% if (ap.status !== 'draft') { %><p class="small muted">Upload a revised document first, then link it here.</p><% } %>
+    <label>Document</label><select name="document_id"><option value="">Keep current</option><% documents.forEach(d => { %><option value="<%= d.id %>"><%= d.title %></option><% }) %></select>
+    <label>Reviewers</label><div class="row"><% team.forEach(m => { %><label style="font-weight:400;flex:0 0 auto"><input type="checkbox" name="reviewers" value="<%= m.id %>" <%= reviewers.find(r => r.user_id === m.id) ? 'checked' : '' %>> <%= m.name %></label><% }) %></div>
+    <label>Note</label><textarea name="comment" style="min-height:50px"></textarea>
+    <p><button class="btn"><%= ap.status === 'draft' ? 'Send for review' : 'Re-submit for review' %></button></p>
+  </form></div><% } %>
+  <% if (open && can('project_manage') && ap.status === 'pending') { %>
+  <div class="card"><h2>Re-appoint reviewers</h2>
+  <form method="post" action="<%= base %>/reviewers"><div class="row"><% team.forEach(m => { %><label style="font-weight:400;flex:0 0 auto"><input type="checkbox" name="reviewers" value="<%= m.id %>" <%= reviewers.find(r => r.user_id === m.id) ? 'checked' : '' %>> <%= m.name %></label><% }) %></div>
+  <p><button class="btn sm">Update reviewers</button></p></form></div><% } %>
+  <div class="card"><h2>History</h2>
+    <% history.forEach(h => { %><div style="padding:5px 0;border-bottom:1px solid var(--line)" class="small"><b><%= h.name || 'System' %></b> — <%= h.action.replace('_',' ') %> <span class="muted">(round <%= h.round %>, <%= fmtDate(h.created_at) %>)</span><% if (h.comment) { %><div><%= h.comment %></div><% } %></div><% }) %>
+    <% if (!history.length) { %><div class="muted">No activity yet.</div><% } %>
+  </div>
+  <% if (open && can('project_manage') && !['approved','cancelled'].includes(ap.status)) { %><form method="post" action="<%= base %>/cancel" data-confirm="Cancel this approval request?"><button class="btn sm grey">Cancel request</button></form><% } %>
+</div></div>
+<%- include('../partials/foot') %>

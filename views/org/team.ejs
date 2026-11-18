@@ -1,0 +1,33 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Team & roles</h1><p class="muted"><%= usage.users %> active users<%= usage.pendingInvites ? ` + ${usage.pendingInvites} pending invites` : '' %> · plan limit <%= limits.users %></p></div></div>
+<div class="grid g2">
+<div class="card" style="grid-column:span 2">
+  <div class="tablewrap"><table><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><% if (can('org_manage')) { %><th></th><% } %></tr>
+  <% members.forEach(m => { %><tr><td><%= m.name %></td><td><%= m.email %></td>
+    <td><% if (can('org_manage')) { %><form method="post" action="/org/members/<%= m.id %>"><select name="role" onchange="this.form.submit()"><% Object.entries(C.ROLES).forEach(([k,v]) => { %><option value="<%= k %>" <%= m.role===k?'selected':'' %>><%= v %></option><% }) %></select></form><% } else { %><%= C.ROLES[m.role] %><% } %></td>
+    <td><%- m.active ? badge('active') : badge('cancelled', 'Inactive') %></td>
+    <% if (can('org_manage')) { %><td class="right"><% if (m.id !== user.id) { %><form method="post" action="/org/members/<%= m.id %>"><input type="hidden" name="action" value="<%= m.active ? 'deactivate' : 'activate' %>"><button class="btn sm grey"><%= m.active ? 'Deactivate' : 'Activate' %></button></form><% } %></td><% } %></tr><% }) %>
+  </table></div>
+</div>
+<% if (can('org_manage')) { %>
+<div class="card"><h2>Invite team member</h2>
+  <form method="post" action="/org/invite">
+    <label>Name</label><input name="name">
+    <label>Email</label><input type="email" name="email" required>
+    <label>Role</label><select name="role"><% Object.entries(C.ROLES).forEach(([k,v]) => { %><option value="<%= k %>" <%= k==='architect'?'selected':'' %>><%= v %></option><% }) %></select>
+    <p><button class="btn">Send invitation email</button></p>
+  </form>
+</div>
+<div class="card"><h2>Pending invitations</h2>
+  <% if (!invites.length) { %><div class="empty">None.</div><% } %>
+  <% invites.forEach(i => { %><div style="display:flex;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)"><div><%= i.email %><div class="muted small"><%= C.ROLES[i.role] %> · sent <%= fmtDate(i.created_at) %></div></div>
+    <div class="nowrap"><form class="inline" method="post" action="/org/invites/<%= i.id %>/resend"><button class="btn sm ghost">Resend</button></form>
+    <form class="inline" method="post" action="/org/invites/<%= i.id %>/revoke"><button class="btn sm grey">Revoke</button></form></div></div><% }) %>
+</div>
+<% } %>
+<div class="card" style="grid-column:span 2"><h2>Roles & permissions</h2>
+  <div class="tablewrap"><table class="small"><tr><th>Permission</th><% Object.values(C.ROLES).forEach(r => { %><th><%= r %></th><% }) %></tr>
+  <% Object.entries(C.PERMS).forEach(([p, roles]) => { %><tr><td><%= p.replace(/_/g,' ') %></td><% Object.keys(C.ROLES).forEach(r => { %><td><%= roles.includes(r) ? '✓' : '' %></td><% }) %></tr><% }) %></table></div>
+</div>
+</div>
+<%- include('../partials/foot') %>

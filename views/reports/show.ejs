@@ -1,0 +1,13 @@
+<%- include('../partials/head') %>
+<% if (locals.project) { %><%- include('../partials/project-nav') %><% } %>
+<div class="head"><div><h1><%= report.title %></h1><p class="muted"><%= report.subtitle %></p></div>
+<div class="noprint"><a class="btn ghost" href="<%= exportBase %>?format=xlsx">Export Excel</a> <a class="btn ghost" href="<%= exportBase %>?format=pdf">Export PDF</a></div></div>
+<% report.sections.forEach(s => { %>
+<div class="card"><h2><%= s.heading %></h2>
+  <% if (s.kpis) { %><div class="grid g4" style="margin-bottom:10px"><% s.kpis.forEach(([k,v]) => { %><div><div class="muted small"><%= k %></div><b><%= v %></b></div><% }) %></div><% } %>
+  <% if (s.table) { %><div class="tablewrap"><table><tr><% s.table.columns.forEach(c => { %><th><%= c %></th><% }) %></tr>
+  <% s.table.rows.forEach(r => { %><tr><% r.forEach(c => { %><td><%= c %></td><% }) %></tr><% }) %>
+  <% if (!s.table.rows.length) { %><tr><td colspan="<%= s.table.columns.length %>" class="empty">No records.</td></tr><% } %></table></div><% } %>
+</div>
+<% }) %>
+<%- include('../partials/foot') %>

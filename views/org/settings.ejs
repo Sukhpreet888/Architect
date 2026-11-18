@@ -1,0 +1,18 @@
+<%- include('../partials/head') %>
+<h1>Organisation profile & preferences</h1>
+<div class="card" style="max-width:760px">
+<form method="post" action="/org/settings">
+  <label>Organisation name</label><input name="name" value="<%= org.name %>" required>
+  <div class="row"><div><label>Phone</label><input name="phone" value="<%= org.phone || '' %>"></div><div><label>Website</label><input name="website" value="<%= org.website || '' %>"></div></div>
+  <label>Address</label><textarea name="address"><%= org.address || '' %></textarea>
+  <div class="row">
+    <div><label>Currency</label><select name="currency"><% ['INR','USD','EUR','GBP','AED','SGD','AUD'].forEach(c => { %><option <%= org.currency===c?'selected':'' %>><%= c %></option><% }) %></select></div>
+    <div><label>Time zone</label><input name="timezone" value="<%= org.timezone %>"></div>
+    <div><label>Default area unit</label><select name="area_unit"><% Object.entries(C.AREA_UNITS).forEach(([k,v]) => { %><option value="<%= k %>" <%= org.area_unit===k?'selected':'' %>><%= v %></option><% }) %></select></div>
+  </div>
+  <div class="row"><div><label>Invoice number prefix</label><input name="invoice_prefix" value="<%= org.invoice_prefix %>"></div><div><label>Billing email</label><input type="email" name="billing_email" value="<%= org.billing_email || '' %>"></div></div>
+  <h3>Notifications</h3>
+  <p class="muted small">All notifications and reminders are delivered by <b>email only</b>: verification, invitations, task assignment & due/overdue reminders, approval requests & pending-review reminders, invoices & payment reminders (3 days before, on due date, 3/7/15 days after), payment receipts, budget & reorder alerts, site-visit reminders, trial & billing notices.</p>
+  <p><button class="btn">Save</button></p>
+</form></div>
+<%- include('../partials/foot') %>

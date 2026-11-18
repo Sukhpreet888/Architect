@@ -1,0 +1,26 @@
+<%- include('../partials/head') %>
+<div class="head"><div><div class="muted small"><a href="/org/templates">Templates</a></div><h1><%= isNew ? 'New template' : tpl.name %> <% if (!isNew) { %><span class="badge b-blue">v<%= tpl.version %></span><% } %></h1></div></div>
+<div class="grid g2">
+<div class="card">
+  <form method="post" action="/org/templates">
+    <% if (!isNew) { %><input type="hidden" name="family_id" value="<%= tpl.family_id %>"><% } %>
+    <label>Name</label><input name="name" value="<%= tpl.name %>" required <%= can('project_manage') ? '' : 'disabled' %>>
+    <label>Workflow definition</label>
+    <textarea class="mono" name="body" <%= can('project_manage') ? '' : 'disabled' %>><%= tpl.body %></textarea>
+    <label>Version notes</label><input name="notes" placeholder="What changed?">
+    <% if (can('project_manage')) { %><p><button class="btn"><%= isNew ? 'Save template' : 'Save as new version' %></button></p><% } %>
+  </form>
+</div>
+<div>
+  <div class="card"><h2>Format</h2>
+  <pre class="mono small" style="white-space:pre-wrap">Phase: Concept Design
+  Subphase: Concept
+    Task: Prepare concept options
+    Deliverable: Concept presentation
+  Approval: Client concept approval
+Phase: Construction Administration [construction]</pre>
+  <p class="small muted">Indentation is optional. <code>[construction]</code> marks phases that apply only to Design + Construction projects.</p></div>
+  <% if (parsed) { %><div class="card"><h2>Preview</h2><ol class="small"><% parsed.phases.forEach(p => { %><li><b><%= p.name %></b><%= p.construction ? ' (construction only)' : '' %> — <%= p.subphases.length %> subphases, <%= p.subphases.reduce((a,s)=>a+s.tasks.length,0) %> tasks, <%= p.subphases.reduce((a,s)=>a+s.deliverables.length,0) %> deliverables, <%= p.approvals.length %> approvals</li><% }) %></ol></div><% } %>
+  <% if (locals.versions && versions.length) { %><div class="card"><h2>Version history</h2><table class="small"><% versions.forEach(v => { %><tr><td><a href="/org/templates/<%= v.id %>">v<%= v.version %></a></td><td><%= v.notes || '' %></td><td><%= v.author || '' %></td><td><%= fmtDate(v.created_at) %></td></tr><% }) %></table></div><% } %>
+</div></div>
+<%- include('../partials/foot') %>

@@ -1,0 +1,23 @@
+<%- include('../partials/head') %>
+<%- include('../partials/project-nav') %>
+<% if (project.status === 'active' && can('task_manage')) { %>
+<details class="card"><summary>+ Create / assign task</summary>
+<form method="post" action="/projects/<%= project.id %>/tasks">
+  <div class="row"><div style="flex:2"><label>Title</label><input name="title" required></div>
+  <div><label>Phase</label><select name="phase_id"><option value="">—</option><% phases.forEach(p => { %><option value="<%= p.id %>" <%= String(query.phase)===String(p.id)?'selected':'' %>><%= p.seq %>. <%= p.name %></option><% }) %></select></div></div>
+  <div class="row">
+    <div><label>Assignee</label><select name="assignee_id"><option value="">Unassigned</option><% team.forEach(m => { %><option value="<%= m.id %>"><%= m.name %></option><% }) %></select></div>
+    <div><label>Start</label><input type="date" name="start_date"></div><div><label>Due</label><input type="date" name="due_date"></div>
+    <div><label>Priority</label><select name="priority"><% Object.entries(C.PRIORITIES).forEach(([k,v]) => { %><option value="<%= k %>" <%= k==='medium'?'selected':'' %>><%= v %></option><% }) %></select></div>
+  </div>
+  <div class="row">
+    <div><label>Depends on</label><select name="depends_on"><option value="">No dependency</option><% allTasks.forEach(t => { %><option value="<%= t.id %>"><%= t.title %></option><% }) %></select></div>
+    <div><label>Deliverable</label><select name="deliverable_id"><option value="">—</option><% deliverables.forEach(d => { %><option value="<%= d.id %>"><%= d.name %></option><% }) %></select></div>
+  </div>
+  <label>Description</label><textarea name="description" style="min-height:50px"></textarea>
+  <p><button class="btn">Create task</button> <span class="muted small">The assignee is notified by email.</span></p>
+</form></details>
+<% } %>
+<form class="row" style="margin-bottom:8px;max-width:420px"><input type="hidden" name="view" value="<%= view %>"><select name="phase" onchange="this.form.submit()"><option value="">All phases</option><% phases.forEach(p => { %><option value="<%= p.id %>" <%= String(query.phase)===String(p.id)?'selected':'' %>><%= p.seq %>. <%= p.name %></option><% }) %></select></form>
+<%- include('../partials/tasks-views') %>
+<%- include('../partials/foot') %>

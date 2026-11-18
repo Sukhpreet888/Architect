@@ -1,0 +1,17 @@
+<%- include('../partials/head') %>
+<div class="head"><div><h1>Select a subscription plan</h1>
+<p class="muted"><% if (sub.onTrial && !sub.expired) { %>Your trial ends <%= fmtDate(org.trial_ends_at) %>. Pick a plan now — you won't be charged until the trial ends.<% } else { %>Choose a plan to activate your workspace.<% } %></p></div>
+<% if (onboarding) { %><a class="btn grey" href="/dashboard">Decide later</a><% } %></div>
+<div class="plans">
+<% plans.forEach(p => { %>
+  <div class="plan <%= org.plan === p.key ? 'cur' : '' %>">
+    <h2 style="margin:0"><%= p.name %></h2>
+    <div class="p"><%= p.price ? '$' + p.price : 'Custom' %><span class="muted small"><%= p.price ? ' / month' : '' %></span></div>
+    <ul><li><%= p.users ? p.users + ' user' + (p.users > 1 ? 's' : '') : 'Custom users' %></li><li><%= p.projects ? p.projects + ' active projects' : 'Custom projects' %></li>
+      <li><%= p.storageMb ? (p.storageMb / 1024) + ' GB storage' : 'Custom storage' %></li><li>All modules · email reminders</li></ul>
+    <% if (org.plan === p.key && !sub.expired) { %><span class="badge b-blue">Current plan</span>
+    <% } else { %><a class="btn" href="/billing/checkout?plan=<%= p.key %><%= onboarding ? '&onboarding=1' : '' %>">Choose <%= p.name %></a><% } %>
+  </div>
+<% }) %>
+</div>
+<%- include('../partials/foot') %>
