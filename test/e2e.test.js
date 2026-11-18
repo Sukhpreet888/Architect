@@ -146,13 +146,50 @@ test('ARCHFLOW full flow', async (t) => {
     assert.ok((await emails('id > ? AND category = ?', before, 'project')).length >= 4, 'team emailed');
     r = await pm.get(`/projects/${S.pid}`);
     assert.equal(r.status, 200);
-    // design-only project marks construction phases N/A
+    // design-only project: construction-only phases are left out by default (not created at all)
     await pm.post('/projects/new/step1', { type: 'commercial', subtype: 'Retail', plot_area: '900', area_unit: 'sqm' });
     r = await pm.post('/projects', { name: 'Retail Fitout', scope: 'design', start_date: start, manager_id: String(S.pm) });
     S.pid2 = Number(r.location.split('/').pop());
-    assert.equal((await db.get("SELECT COUNT(*) c FROM phases WHERE project_id = ? AND status = 'na'", S.pid2)).c, 2);
+    const p2 = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', S.pid2);
+    assert.equal(p2.length, 9);
+    assert.ok(!p2.some((p) => /Tendering|Construction Administration/.test(p.name)));
     r = await pm.get(`/projects/${S.pid2}/construction`);
     assert.match(r.text, /module is available for <b>Design \+ Construction<\/b> projects only/);
+
+    // choose exactly which phases a project gets
+    r = await pm.get('/projects/new/step2');
+    assert.equal(r.location, '/projects/new', 'draft consumed');
+    await pm.post('/projects/new/step1', { type: 'exterior', subtype: 'Facade', plot_area: '300', area_unit: 'sqm' });
+    r = await pm.get('/projects/new/step2');
+    assert.match(r.text, /Project phases/);
+    r = await pm.post('/projects', { name: 'Facade only', scope: 'design', start_date: start, manager_id: String(S.pm), phases_submitted: '1' });
+    assert.equal(r.location, '/projects/new/step2', 'at least one phase required');
+    r = await pm.post('/projects', { name: 'Facade only', scope: 'design', start_date: start, manager_id: String(S.pm), phases_submitted: '1', phases: ['0', '2', '9'] });
+    S.pid3 = Number(r.location.split('/').pop());
+    let p3 = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', S.pid3);
+    assert.deepEqual(p3.map((p) => [p.seq, p.name]), [[1, 'Pre-design & Client Brief'], [2, 'Concept Design'], [3, 'Handover & Closeout']]);
+    assert.equal(p3[0].status, 'in_progress');
+    assert.ok((await db.get('SELECT COUNT(*) c FROM tasks WHERE project_id = ?', S.pid3)).c === 6);
+
+    // manage phases after creation: add a template phase in position 2, add a custom one, remove an untouched one
+    r = await pm.get(`/projects/${S.pid3}/phases`);
+    assert.match(r.text, /Manage phases/);
+    await pm.post(`/projects/${S.pid3}/phases/add`, { template_phase: '1', after_seq: '1' });
+    await pm.post(`/projects/${S.pid3}/phases/add`, { name: 'Interior Styling', after_seq: '4' });
+    p3 = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', S.pid3);
+    assert.deepEqual(p3.map((p) => p.name), ['Pre-design & Client Brief', 'Site Analysis & Feasibility', 'Concept Design', 'Handover & Closeout', 'Interior Styling']);
+    assert.ok((await db.get('SELECT COUNT(*) c FROM tasks WHERE phase_id = ?', p3[1].id)).c === 2, 'template tasks added');
+    // a phase with started work can't be removed
+    await db.run("UPDATE tasks SET status = 'in_progress' WHERE phase_id = ?", p3[2].id);
+    r = await pm.post(`/projects/${S.pid3}/phases/${p3[2].id}/remove`, {});
+    assert.ok(await db.get('SELECT 1 FROM phases WHERE id = ?', p3[2].id), 'blocked: tasks started');
+    r = await pm.post(`/projects/${S.pid3}/phases/${p3[3].id}/remove`, {});
+    p3 = await db.all('SELECT * FROM phases WHERE project_id = ? ORDER BY seq', S.pid3);
+    assert.deepEqual(p3.map((p) => [p.seq, p.name]), [[1, 'Pre-design & Client Brief'], [2, 'Site Analysis & Feasibility'], [3, 'Concept Design'], [4, 'Interior Styling']]);
+    r = await arch.post(`/projects/${S.pid3}/phases/add`, { name: 'Nope' });
+    assert.equal(r.status, 404, 'architect is not on this project / cannot manage phases');
+    // keep later plan-limit tests unaffected
+    await db.run("UPDATE projects SET status = 'closed' WHERE id = ?", S.pid3);
   });
 
   await t.test('task management: create, assign, dependency, views, kanban update', async () => {

@@ -5,7 +5,7 @@ const N = require('../notify');
 const S = require('../services');
 const { PROJECT_TYPES, AREA_UNITS, SCOPES } = require('../config');
 const { requireOrg, perm, loadProject, projectOpen, httpError } = require('../mw');
-const { num, int, arr, isDate, today, mapSeq, filterSeq } = require('../util');
+const { num, int, arr, isDate, today, mapSeq, filterSeq, parseTemplate } = require('../util');
 
 router.use('/projects', requireOrg);
 router.param('pid', (req, res, next) => (/^\d+$/.test(req.params.pid) ? next() : next('route')));
@@ -44,7 +44,9 @@ router.get('/projects/new/step2', perm('project_create'), async (req, res) => {
   if (!req.session.projectDraft) return res.redirect('/projects/new');
   res.render('projects/new-step2', {
     title: 'New project — Step 2: Project information', draft: req.session.projectDraft, form: { start_date: today(), manager_id: req.user.id, scope: 'design' },
-    members: await S.activeMembers(req.org.id), templates: await db.all('SELECT * FROM templates WHERE org_id = ? AND is_current = 1 ORDER BY name', req.org.id),
+    members: await S.activeMembers(req.org.id),
+    templates: (await db.all('SELECT * FROM templates WHERE org_id = ? AND is_current = 1 ORDER BY name', req.org.id))
+      .map((t) => ({ ...t, phases: parseTemplate(t.body).phases })),
   });
 });
 router.post('/projects', perm('project_create'), async (req, res) => {
@@ -60,6 +62,7 @@ router.post('/projects', perm('project_create'), async (req, res) => {
   if (b.client_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(b.client_email)) errors.push('Client email is invalid (invoices and reminders are emailed to it).');
   const managerId = int(b.manager_id);
   if (managerId && !await S.isOrgUser(req.org.id, managerId)) errors.push('Invalid project manager.');
+  if (b.phases_submitted && !arr(b.phases).length) errors.push('Select at least one phase for the project.');
   if (errors.length) {
     req.flash('error', errors.join(' '));
     return res.redirect('/projects/new/step2');
@@ -70,7 +73,7 @@ router.post('/projects', perm('project_create'), async (req, res) => {
     manager_id: managerId || req.user.id, contract_value: b.contract_value ? num(b.contract_value) : null,
     construction_budget: b.scope === 'design_construction' ? num(b.construction_budget) : 0, template_id: int(b.template_id),
   };
-  const id = await S.createProjectWithWorkflow(req.org.id, req.user.id, data, arr(b.members).map(Number));
+  const id = await S.createProjectWithWorkflow(req.org.id, req.user.id, data, arr(b.members).map(Number), arr(b.phases).map(Number));
   req.session.projectDraft = undefined;
   const project = await db.get('SELECT * FROM projects WHERE id = ?', id);
   await N.projectCreated(project, req.user);
@@ -124,7 +127,17 @@ router.post('/projects/:pid/members', loadProject, projectOpen, perm('project_ma
 // ---- Phase tracker (10 architectural phases)
 router.get('/projects/:pid/phases', loadProject, async (req, res) => {
   const prog = await S.phaseProgress(req.project.id);
-  res.render('projects/phases', { title: `${req.project.name} — Phase tracker`, prog });
+  let manage = null;
+  if (req.can('project_manage') && req.project.status === 'active') {
+    const tpl = await db.get('SELECT * FROM templates WHERE id = ? AND org_id = ?', req.project.template_id, req.org.id);
+    const present = new Set(prog.phases.map((p) => p.name.toLowerCase()));
+    const templatePhases = tpl ? parseTemplate(tpl.body).phases.map((p, i) => ({ i, name: p.name, construction: p.construction }))
+      .filter((p) => !present.has(p.name.toLowerCase())) : [];
+    const blockers = {};
+    for (const ph of prog.phases) blockers[ph.id] = await S.phaseRemovalBlocker(ph);
+    manage = { templatePhases, blockers };
+  }
+  res.render('projects/phases', { title: `${req.project.name} — Phase tracker`, prog, manage });
 });
 
 async function loadPhase(req, res, next) {
@@ -217,6 +230,40 @@ router.post('/projects/:pid/phases/:phid/status', loadProject, projectOpen, load
     else if (ph.status === 'not_started') await db.run("UPDATE phases SET status = 'na' WHERE id = ?", ph.id);
   }
   res.redirect(`/projects/${req.project.id}/phases/${ph.id}`);
+});
+
+// ---- Manage which phases the project has (add from template / custom, remove untouched phases)
+router.post('/projects/:pid/phases/add', loadProject, projectOpen, perm('project_manage'), async (req, res) => {
+  const b = req.body;
+  const back = `/projects/${req.project.id}/phases`;
+  const count = (await db.get('SELECT COUNT(*) c FROM phases WHERE project_id = ?', req.project.id)).c;
+  const afterSeq = Math.max(0, Math.min(count, int(b.after_seq) ?? count));
+  let tplPhase = null; let name = String(b.name || '').trim();
+  if (b.template_phase !== undefined && b.template_phase !== '') {
+    const tpl = await db.get('SELECT * FROM templates WHERE id = ? AND org_id = ?', req.project.template_id, req.org.id);
+    tplPhase = tpl ? parseTemplate(tpl.body).phases[int(b.template_phase)] : null;
+    if (!tplPhase) { req.flash('error', 'That template phase was not found.'); return res.redirect(back); }
+    name = tplPhase.name;
+  }
+  if (!name) { req.flash('error', 'Choose a template phase or enter a name for a custom phase.'); return res.redirect(back); }
+  if (b.planned_start && b.planned_end && b.planned_end < b.planned_start) { req.flash('error', 'Phase end date must be after its start date.'); return res.redirect(back); }
+  await S.addPhaseToProject(req.project, {
+    name, tplPhase, afterSeq, userId: req.user.id,
+    plannedStart: isDate(b.planned_start) ? b.planned_start : null, plannedEnd: isDate(b.planned_end) ? b.planned_end : null,
+  });
+  req.flash('success', `Phase "${name}" added${tplPhase ? ' with its template tasks, deliverables and approvals' : ''}.`);
+  res.redirect(back);
+});
+
+router.post('/projects/:pid/phases/:phid/remove', loadProject, projectOpen, loadPhase, perm('project_manage'), async (req, res) => {
+  const back = `/projects/${req.project.id}/phases`;
+  const total = (await db.get('SELECT COUNT(*) c FROM phases WHERE project_id = ?', req.project.id)).c;
+  if (total <= 1) { req.flash('error', 'A project needs at least one phase.'); return res.redirect(back); }
+  const blocker = await S.phaseRemovalBlocker(req.phase);
+  if (blocker) { req.flash('error', `"${req.phase.name}" can't be removed: ${blocker}`); return res.redirect(back); }
+  await S.removePhase(req.project, req.phase);
+  req.flash('success', `Phase "${req.phase.name}" removed from the project.`);
+  res.redirect(back);
 });
 
 module.exports = router;

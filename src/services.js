@@ -96,38 +96,102 @@ async function ensureDefaultTemplate(orgId, userId) {
 }
 
 /** Create the project and generate its workflow (phases, subphases, tasks, deliverables, approvals) from a template. */
-async function createProjectWithWorkflow(orgId, userId, data, memberIds) {
+/** Template phases selected by default for a scope: every phase, except construction-only ones on design-only projects. */
+function defaultPhaseSelection(phases, scope) {
+  return phases.map((p, i) => i).filter((i) => scope === 'design_construction' || !phases[i].construction);
+}
+
+/** Insert one template phase's subphases, tasks, deliverables and approval checkpoints under phaseId. */
+async function addPhaseContent(projectId, phaseId, tplPhase, ps, pe, userId) {
+  for (const [si, sp] of tplPhase.subphases.entries()) {
+    const subId = await db.insert('subphases', { phase_id: phaseId, name: sp.name, seq: si + 1 });
+    for (const d of sp.deliverables) await db.insert('deliverables', { project_id: projectId, phase_id: phaseId, subphase_id: subId, name: d, due_date: pe });
+    for (const t of sp.tasks) await db.insert('tasks', { project_id: projectId, phase_id: phaseId, subphase_id: subId, title: t, start_date: ps, due_date: pe, source: 'template', created_by: userId });
+  }
+  for (const a of tplPhase.approvals) await db.insert('approvals', { project_id: projectId, phase_id: phaseId, type: 'design', title: a, status: 'draft' });
+}
+
+/**
+ * Create the project and generate its workflow from a template. Only the phases chosen by the user
+ * (selectedIdx = indexes into the template's phases) are created; null means the scope's default selection.
+ */
+async function createProjectWithWorkflow(orgId, userId, data, memberIds, selectedIdx = null) {
   return await db.tx(async () => {
+    await ensureDefaultTemplate(orgId, userId);
     const tpl = await db.get('SELECT * FROM templates WHERE id = ? AND org_id = ?', data.template_id, orgId)
-      || await db.get('SELECT * FROM templates WHERE id = ?', await ensureDefaultTemplate(orgId, userId));
+      || await db.get('SELECT * FROM templates WHERE org_id = ? AND is_current = 1 ORDER BY id LIMIT 1', orgId);
     const { phases } = parseTemplate(tpl.body);
+    const wanted = new Set((selectedIdx && selectedIdx.length ? selectedIdx : defaultPhaseSelection(phases, data.scope))
+      .map(Number).filter((i) => i >= 0 && i < phases.length));
+    const chosen = phases.filter((p, i) => wanted.has(i));
+    if (!chosen.length) throw Object.assign(new Error('Select at least one phase for the project.'), { status: 400 });
     const projectId = await db.insert('projects', { ...data, org_id: orgId, template_id: tpl.id, code: await nextProjectCode(orgId), created_by: userId });
     const members = new Set([...memberIds, userId, data.manager_id].filter(Boolean).map(Number));
     for (const uid of members) if (await isOrgUser(orgId, uid)) await db.run('INSERT INTO project_members (project_id, user_id) VALUES (?, ?) ON CONFLICT DO NOTHING', projectId, uid);
 
-    const applicable = phases.filter((p) => data.scope === 'design_construction' || !p.construction);
+    // spread the selected phases evenly between the start and target end dates
     const start = data.start_date || today();
-    const end = data.end_date && data.end_date > start ? data.end_date : addDays(start, applicable.length * 30);
-    const span = Math.max(daysBetween(start, end), applicable.length);
-    const per = span / Math.max(applicable.length, 1);
-    let idx = 0; let seq = 0; let first = true;
-    for (const ph of phases) {
-      seq++;
-      const isApplicable = data.scope === 'design_construction' || !ph.construction;
-      let ps = null; let pe = null;
-      if (isApplicable) { ps = addDays(start, Math.round(idx * per)); pe = addDays(start, Math.round((idx + 1) * per) - 1); idx++; }
-      const status = !isApplicable ? 'na' : first ? 'in_progress' : 'not_started';
-      const phaseId = await db.insert('phases', { project_id: projectId, seq, name: ph.name, status, planned_start: ps, planned_end: pe, started_at: status === 'in_progress' ? today() : null });
-      if (isApplicable) first = false;
-      if (!isApplicable) continue;
-      for (const [si, sp] of ph.subphases.entries()) {
-        const subId = await db.insert('subphases', { phase_id: phaseId, name: sp.name, seq: si + 1 });
-        for (const d of sp.deliverables) await db.insert('deliverables', { project_id: projectId, phase_id: phaseId, subphase_id: subId, name: d, due_date: pe });
-        for (const t of sp.tasks) await db.insert('tasks', { project_id: projectId, phase_id: phaseId, subphase_id: subId, title: t, start_date: ps, due_date: pe, source: 'template', created_by: userId });
-      }
-      for (const a of ph.approvals) await db.insert('approvals', { project_id: projectId, phase_id: phaseId, type: 'design', title: a, status: 'draft' });
+    const end = data.end_date && data.end_date > start ? data.end_date : addDays(start, chosen.length * 30);
+    const span = Math.max(daysBetween(start, end), chosen.length);
+    const per = span / chosen.length;
+    for (const [i, ph] of chosen.entries()) {
+      const ps = addDays(start, Math.round(i * per)); const pe = addDays(start, Math.round((i + 1) * per) - 1);
+      const status = i === 0 ? 'in_progress' : 'not_started';
+      const phaseId = await db.insert('phases', { project_id: projectId, seq: i + 1, name: ph.name, status, planned_start: ps, planned_end: pe, started_at: status === 'in_progress' ? today() : null });
+      await addPhaseContent(projectId, phaseId, ph, ps, pe, userId);
     }
     return projectId;
+  });
+}
+
+/** Renumber a project's phases 1..n in their current order. */
+async function renumberPhases(projectId) {
+  const rows = await db.all('SELECT id FROM phases WHERE project_id = ? ORDER BY seq, id', projectId);
+  for (const [i, r] of rows.entries()) await db.run('UPDATE phases SET seq = ? WHERE id = ?', i + 1, r.id);
+}
+
+/**
+ * Add a phase to an existing project after position `afterSeq` (0 = first). With tplPhase, its subphases,
+ * tasks, deliverables and approvals come from the template; otherwise an empty custom phase is created.
+ */
+async function addPhaseToProject(project, { name, tplPhase, afterSeq, plannedStart, plannedEnd, userId }) {
+  return await db.tx(async () => {
+    await db.run('UPDATE phases SET seq = seq + 1 WHERE project_id = ? AND seq > ?', project.id, afterSeq);
+    const anyActive = await db.get("SELECT 1 FROM phases WHERE project_id = ? AND status IN ('in_progress','in_review')", project.id);
+    const anyOpen = await db.get("SELECT 1 FROM phases WHERE project_id = ? AND status = 'not_started'", project.id);
+    // if every other phase is already completed, the new phase becomes the active one
+    const status = !anyActive && !anyOpen ? 'in_progress' : 'not_started';
+    const phaseId = await db.insert('phases', { project_id: project.id, seq: afterSeq + 1, name, status, planned_start: plannedStart, planned_end: plannedEnd, started_at: status === 'in_progress' ? today() : null });
+    if (tplPhase) await addPhaseContent(project.id, phaseId, tplPhase, plannedStart, plannedEnd, userId);
+    await renumberPhases(project.id);
+    return phaseId;
+  });
+}
+
+/** Why a phase cannot be removed (or null if it can). Only phases where no work has happened may be removed. */
+async function phaseRemovalBlocker(phase) {
+  if (phase.status === 'completed') return 'It is already completed.';
+  if (phase.status === 'in_review') return 'It is in review.';
+  const done = await db.get("SELECT COUNT(*) c FROM tasks WHERE phase_id = ? AND (status != 'todo' OR progress > 0)", phase.id);
+  if (done.c) return 'Some of its tasks have already been started.';
+  const docs = await db.get('SELECT COUNT(*) c FROM documents WHERE phase_id = ?', phase.id);
+  if (docs.c) return 'Documents have been uploaded to it.';
+  const aps = await db.get("SELECT COUNT(*) c FROM approvals WHERE phase_id = ? AND status != 'draft'", phase.id);
+  if (aps.c) return 'It has approval requests.';
+  return null;
+}
+
+/** Remove a phase (and its untouched tasks, deliverables and draft approvals); opens the next phase if it was active. */
+async function removePhase(project, phase) {
+  return await db.tx(async () => {
+    await db.run('DELETE FROM tasks WHERE phase_id = ?', phase.id);
+    await db.run("DELETE FROM approvals WHERE phase_id = ? AND status = 'draft'", phase.id);
+    await db.run('DELETE FROM phases WHERE id = ?', phase.id); // cascades subphases & deliverables
+    await renumberPhases(project.id);
+    if (phase.status === 'in_progress') {
+      const next = await db.get("SELECT * FROM phases WHERE project_id = ? AND status = 'not_started' ORDER BY seq LIMIT 1", project.id);
+      if (next) await db.run("UPDATE phases SET status = 'in_progress', started_at = ? WHERE id = ?", today(), next.id);
+    }
   });
 }
 
@@ -244,6 +308,6 @@ async function closureChecklist(project) {
 module.exports = {
   can, orgLimits, orgUsage, subscriptionState, orgMembers, activeMembers, emailsForRoles, userById, isOrgUser,
   visibleProjects, canAccessProject, projectTeam, projectTeamEmails, projectManagerEmails, ensureDefaultTemplate,
-  createProjectWithWorkflow, phaseProgress, completePhase, invoiceTotals, refreshInvoiceStatus, nextInvoiceNumber,
+  createProjectWithWorkflow, defaultPhaseSelection, addPhaseToProject, phaseRemovalBlocker, removePhase, renumberPhases, phaseProgress, completePhase, invoiceTotals, refreshInvoiceStatus, nextInvoiceNumber,
   paymentsSummary, resolveApproval, closureChecklist,
 };

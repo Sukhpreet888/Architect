@@ -15,14 +15,54 @@
 </div>
 <div class="card">
   <h2>Execution scope</h2>
-  <% Object.entries(C.SCOPES).forEach(([k,v]) => { %><label style="font-weight:400"><input type="radio" name="scope" value="<%= k %>" <%= form.scope===k?'checked':'' %> onchange="document.getElementById('budget').style.display = this.value==='design_construction' ? '' : 'none'"> <%= v %></label><% }) %>
+  <% Object.entries(C.SCOPES).forEach(([k,v]) => { %><label style="font-weight:400"><input type="radio" name="scope" value="<%= k %>" <%= form.scope===k?'checked':'' %> onchange="scopeChanged(this.value)"> <%= v %></label><% }) %>
   <div id="budget" style="display:none"><label>Construction budget <span class="muted">(<%= org.currency %>)</span></label><input type="number" step="any" min="0" name="construction_budget"></div>
-  <label>Workflow template</label><select name="template_id"><% templates.forEach(t => { %><option value="<%= t.id %>"><%= t.name %> (v<%= t.version %>)</option><% }) %></select>
+  <label>Workflow template</label><select name="template_id" onchange="templateChanged(this.value)"><% templates.forEach(t => { %><option value="<%= t.id %>"><%= t.name %> (v<%= t.version %>)</option><% }) %></select>
   <h2 style="margin-top:18px">Team</h2>
   <label>Project manager</label><select name="manager_id"><% members.forEach(m => { %><option value="<%= m.id %>" <%= m.id===form.manager_id?'selected':'' %>><%= m.name %> — <%= C.ROLES[m.role] %></option><% }) %></select>
   <label>Team members</label>
   <% members.forEach(m => { %><label style="font-weight:400;margin:4px 0"><input type="checkbox" name="members" value="<%= m.id %>" <%= m.id===user.id?'checked':'' %>> <%= m.name %> <span class="muted small"><%= C.ROLES[m.role] %></span></label><% }) %>
 </div></div>
-<p><button class="btn">Create project & generate workflow</button></p>
+<div class="card" id="phase-picker"><input type="hidden" name="phases_submitted" value="1">
+  <div class="head" style="margin-bottom:8px"><div><h2 style="margin:0">Project phases</h2>
+    <p class="muted small" style="margin:4px 0 0">Choose which phases this project needs. Only the selected phases (with their tasks, deliverables and approvals) are created. You can add or remove phases later from the Phase tracker.</p></div>
+    <div class="nowrap"><button type="button" class="btn sm grey" onclick="setAll(true)">Select all</button> <button type="button" class="btn sm grey" onclick="setAll(false)">Clear</button></div></div>
+  <% templates.forEach((t, ti) => { %>
+  <div class="phase-group" data-template="<%= t.id %>" <%= ti === 0 ? '' : 'hidden' %>>
+    <div class="phase-picks">
+    <% t.phases.forEach((ph, i) => { const on = form.scope === 'design_construction' || !ph.construction;
+      const nt = ph.subphases.reduce((a, sp) => a + sp.tasks.length, 0), nd = ph.subphases.reduce((a, sp) => a + sp.deliverables.length, 0), na = ph.approvals.length;
+      const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`; %>
+      <label class="phase-pick"><input type="checkbox" name="phases" value="<%= i %>" data-construction="<%= ph.construction ? 1 : 0 %>" <%= on ? 'checked' : '' %> <%= ti === 0 ? '' : 'disabled' %> onchange="countPhases()">
+        <span><b><%= i + 1 %>. <%= ph.name %></b><br><span class="muted small"><%= pl(nt, 'task') %> · <%= pl(nd, 'deliverable') %><%= na ? ' · ' + pl(na, 'approval') : '' %><%= ph.construction ? ' · construction only' : '' %></span></span></label>
+    <% }) %>
+    </div>
+  </div>
+  <% }) %>
+  <p class="small" style="margin:10px 0 0"><b id="phase-count"></b> <span id="phase-warn" class="small" style="color:var(--red)"></span></p>
+</div>
+<p><button class="btn" id="create-btn">Create project & generate workflow</button></p>
 </form>
+<script>
+const groups = () => [...document.querySelectorAll('.phase-group')];
+const activeGroup = () => groups().find((g) => !g.hidden);
+function countPhases() {
+  const n = activeGroup().querySelectorAll('input[name=phases]:checked').length;
+  document.getElementById('phase-count').textContent = `${n} phase${n === 1 ? '' : 's'} selected`;
+  document.getElementById('phase-warn').textContent = n ? '' : 'Select at least one phase.';
+  document.getElementById('create-btn').disabled = !n;
+}
+function templateChanged(id) {
+  groups().forEach((g) => { const on = g.dataset.template === String(id); g.hidden = !on; g.querySelectorAll('input').forEach((i) => { i.disabled = !on; }); });
+  scopeChanged(document.querySelector('input[name=scope]:checked').value, true);
+}
+function scopeChanged(scope, quiet) {
+  document.getElementById('budget').style.display = scope === 'design_construction' ? '' : 'none';
+  // construction-only phases follow the scope: on for Design + Construction, off for Design only
+  activeGroup().querySelectorAll('input[data-construction="1"]').forEach((i) => { i.checked = scope === 'design_construction'; });
+  countPhases();
+}
+function setAll(on) { activeGroup().querySelectorAll('input[name=phases]').forEach((i) => { i.checked = on; }); countPhases(); }
+scopeChanged(document.querySelector('input[name=scope]:checked').value);
+</script>
 <%- include('../partials/foot') %>

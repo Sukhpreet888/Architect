@@ -4,8 +4,8 @@
 <div class="card progress-summary">
   <%- include('../partials/donut', { pct: prog.pct, size: 150, label: 'complete' }) %>
   <div class="progress-facts">
-    <h2 style="margin:0 0 4px">Project completion: <%= prog.pct %>%</h2>
-    <p class="muted small" style="margin:0 0 12px">Average completion of the <%= prog.applicable %> applicable phases. Each phase's % comes from its tasks' progress.</p>
+    <div class="head" style="margin:0 0 4px"><h2 style="margin:0">Project completion: <%= prog.pct %>%</h2><% if (manage) { %><a class="btn sm ghost" href="?manage=1#manage">Add / remove phases</a><% } %></div>
+    <p class="muted small" style="margin:0 0 12px">Average completion of the <%= prog.applicable %> phases in this project. Each phase's % comes from its tasks' progress.</p>
     <div class="grid g3">
       <div><div class="muted small">Phases completed</div><b><%= completedPhases %> of <%= prog.applicable %></b></div>
       <div><div class="muted small">Tasks done</div><b><%= prog.tasksDone %> of <%= prog.tasksTotal %></b></div>
@@ -26,4 +26,43 @@
 <% }) %>
 </div>
 <p class="muted small">Phase % = average progress of the phase's tasks (a task marked done counts as 100%). A phase approved/marked complete is 100%.</p>
+<% if (manage) { %>
+<details class="card manage-phases" id="manage" <%= query.manage ? 'open' : '' %>>
+  <summary>Manage phases — add or remove phases in this project</summary>
+  <div class="grid g2" style="margin-top:12px">
+    <div>
+      <h3 style="margin-top:0">Phases in this project</h3>
+      <table class="small">
+      <% prog.phases.forEach(ph => { const why = manage.blockers[ph.id]; %>
+        <tr><td><%= ph.seq %>. <%= ph.name %></td><td><%- badge(ph.status === 'na' ? 'cancelled' : ph.status, ph.status === 'na' ? 'N/A' : null) %></td>
+        <td class="right">
+          <% if (why || prog.phases.length <= 1) { %><span class="muted" title="<%= why || 'A project needs at least one phase.' %>">Can't remove</span>
+          <% } else { %><form class="inline" method="post" action="/projects/<%= project.id %>/phases/<%= ph.id %>/remove" data-confirm="Remove the phase &quot;<%= ph.name %>&quot; and its tasks, deliverables and draft approvals from this project?"><button class="btn sm grey">Remove</button></form><% } %>
+        </td></tr>
+      <% }) %>
+      </table>
+      <p class="muted small">Only phases where no work has started (no started tasks, uploads or approval requests) can be removed.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Add a phase</h3>
+      <form method="post" action="/projects/<%= project.id %>/phases/add">
+        <label>From the project template</label>
+        <select name="template_phase" onchange="this.form.name.disabled = this.value !== ''">
+          <option value="">— Custom phase (enter a name below) —</option>
+          <% manage.templatePhases.forEach(tp => { %><option value="<%= tp.i %>"><%= tp.name %><%= tp.construction ? ' (construction)' : '' %></option><% }) %>
+        </select>
+        <% if (!manage.templatePhases.length) { %><p class="muted small" style="margin:4px 0 0">All template phases are already in this project.</p><% } %>
+        <label>Custom phase name</label><input name="name" placeholder="e.g. Interior Design">
+        <label>Position</label>
+        <select name="after_seq">
+          <option value="0">At the start</option>
+          <% prog.phases.forEach(ph => { %><option value="<%= ph.seq %>" <%= ph.seq === prog.phases.length ? 'selected' : '' %>>After <%= ph.seq %>. <%= ph.name %></option><% }) %>
+        </select>
+        <div class="row"><div><label>Planned start <span class="muted">(optional)</span></label><input type="date" name="planned_start"></div><div><label>Planned end <span class="muted">(optional)</span></label><input type="date" name="planned_end"></div></div>
+        <p><button class="btn">Add phase</button></p>
+      </form>
+    </div>
+  </div>
+</details>
+<% } %>
 <%- include('../partials/foot') %>
